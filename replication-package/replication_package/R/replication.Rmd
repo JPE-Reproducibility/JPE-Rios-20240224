@@ -1,0 +1,1452 @@
+
+---
+title: "Replication file"
+output:
+  pdf_document:
+    keep_tex: true
+    latex_engine: xelatex
+  html_document: default
+header-includes:
+ - \usepackage{floatrow}
+ - \usepackage{booktabs}
+ - \usepackage{array}
+ - \usepackage{multirow}
+ - \usepackage{threeparttable}
+ - \floatsetup[figure]{capposition=top}
+ - \usepackage{caption}
+ - \newcolumntype{L}[1]{>{\raggedright\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+ - \newcolumntype{C}[1]{>{\centering\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+ - \newcolumntype{R}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+---
+
+# Description
+The current file serves the purpose of replicating all tables and figures in the paper.
+
+# Libraries
+```{r echo=FALSE, message=FALSE, results='hide'}
+rm(list = ls())
+gc()
+
+library(dplyr)
+library(tidyr)
+library(magrittr)
+library(stargazer)
+library(ggplot2)
+library(kableExtra)
+library(stringr) # string functions
+library(RColorBrewer) # handle colors
+library(AER)
+```
+
+```{r func_clean_tables, echo=FALSE, warning=FALSE, message=FALSE}
+make_clean_table <- function(out,
+                             caption = "",
+                             label = "",
+                             header = "",
+                             paper_layout = FALSE) {
+  # Replace hlines with midrules initially
+  out <- gsub("\\\\hline.*", "", out)
+
+  if (paper_layout) {
+    # Constant is not reported; the Strata FE row goes after Observations,
+    # with a single rule before the summary rows.
+    i <- grep("^\\s*Constant &", out)
+    if (length(i) == 1) out <- out[-c(i, i + 1)]
+    st <- grep("^Strata FE", out); ob <- grep("^Observations", out)
+    if (length(st) == 1 && length(ob) == 1) {
+      strata <- out[st]; out <- out[-st]; ob <- grep("^Observations", out)
+      out <- append(out, strata, after = ob)
+    }
+    mn <- grep("^Mean", out)
+    if (length(mn) == 1) out[mn] <- paste0("\\midrule\n", out[mn])
+  }
+
+  # Add \toprule after begin{tabular}
+  out[grep("begin\\{tabular\\}", out)] <- paste0(out[grep("begin\\{tabular\\}", out)], "\n\\toprule\n", header)
+
+  if (!paper_layout) {
+    # Add \midrule before Strata
+    out[grep("Strata.*", out)] <- paste0("\\midrule\n", out[grep("Strata.*", out)])
+
+    # Add \midrule before Observations
+    out[grep("Observations.*", out)] <- paste0("\\midrule\n", out[grep("Observations.*", out)])
+  }
+
+  # Add \bottomrule before end{tabular}
+  out[grep("end\\{tabular\\}", out)] <- paste0("\\bottomrule\n", out[grep("end\\{tabular\\}", out)])
+
+  # Remove lines that are just empty column separators
+  out <- out[!grepl("^\\s*(?:&\\s*)+\\\\\\s*$", out)]
+
+  # 2. Replace caption and label
+  out <- gsub("\\\\caption\\{.*\\}", paste0("\\\\caption{", caption, "}"), out)
+  out <- gsub("\\\\label\\{.*\\}", paste0("\\\\label{", label, "}"), out)
+
+  # 3. Move notes outside tabular
+  note_lines <- grep("Note:", out, value = TRUE)
+  out <- out[!grepl("Note:", out)]
+
+  # Standard significance footnote
+  note_lines <- "{\\footnotesize \\emph{Note:}  Significance reported: $^{*}p<0.1$; $^{**}p<0.05$; $^{***}p<0.01$}"
+
+  # 4. Wrap tabular in \centerline{\scalebox{0.85}{…}}
+  start_tab <- grep("\\\\begin\\{tabular\\}", out)
+  end_tab <- grep("\\\\end\\{tabular\\}", out)
+  out[start_tab] <- paste0("\\centerline{\\scalebox{0.85}{", out[start_tab])
+  out[end_tab] <- paste0(out[end_tab], "}}")
+
+  # 5. Append notes after tabular
+  out <- append(out, note_lines, after = end_tab)
+
+  # --- Additional cleanups ---
+
+  # 2. Collapse duplicate midrules before bottomrule
+  out <- gsub("\\\\midrule[[:space:]]*\\\\midrule.*\\\\bottomrule", "\\\\bottomrule", out)
+
+  # 3. Simplify top section: remove extra midrules after \toprule
+  out <- gsub("\\\\toprule\\s*.*\\\\midrule.*\\\\midrule.*", "\\\\toprule", out)
+
+  # 4. Simplify the line with (1) & (2)
+  out <- gsub("\\\\[-1.8ex] & \\(1\\) & \\(2\\)\\\\\\s*\\\\midrule.*", "\\\\midrule", out)
+
+  # 5. Remove "Dependent variable" header lines
+  out <- out[!grepl("Dependent variable", out)]
+  out <- out[!grepl("\\\\cline", out)]
+
+  out <- gsub("\\\\centering", "", out)
+  out <- gsub("\\\\[-1.8ex]", "", out, fixed = TRUE)
+
+  # Find all lines that contain "& (1)" (covers cases with more columns too)
+  idx <- grep("& \\(1\\)", out)
+
+  # Insert \midrule after each match
+  if (length(idx) > 0) {
+    for (i in rev(idx)) { # reverse order so indices don’t shift
+      out <- append(out, "\\midrule", after = i)
+    }
+  }
+
+  # remove lines that are only spaces/tabs
+  out <- out[!grepl("^\\s*$", out)]
+
+
+
+  # Return cleaned LaTeX
+  return(out)
+}
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# Use paths relative to this replication package.
+project_dir <- normalizePath("..", mustWork = TRUE)
+data_dir <- file.path(project_dir, "Data")
+output_dir <- file.path(project_dir, "R", "outputs")
+table_dir <- file.path(output_dir, "tables")
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+d20 <- read.csv(file.path(data_dir, "data_2020.csv"), na.strings = "__REPLICATION_MISSING__", check.names = FALSE, colClasses = c(finished = "character"))
+d22 <- data.table::fread(file.path(data_dir, "data_2022.csv"), data.table = FALSE, showProgress = FALSE, na.strings = c("", "NA"))
+d23 <- data.table::fread(file.path(data_dir, "data_2023.csv"), data.table = FALSE, showProgress = FALSE, na.strings = c("", "NA"))
+c23 <- read.csv(file.path(data_dir, "carreras_2023.csv"), sep = ",", header = TRUE)
+dc <- rbind(
+  d23 %>%
+    filter(in_policy == 1) %>%
+    dplyr::select(
+      mrun, codigo_carrera_assigned_int, female, private, voucher, public,
+      MATE1_MAX, CLEC_MAX, PROMEDIO_CM_MAX, CODIGO_REGION_DOMICILIO
+    ) %>%
+    dplyr::rename(
+      codigo_carrera = codigo_carrera_assigned_int,
+      math = MATE1_MAX, verbal = CLEC_MAX, avg_math_verval = PROMEDIO_CM_MAX,
+      region = CODIGO_REGION_DOMICILIO
+    ) %>%
+    dplyr::mutate(type = "int"),
+  d23 %>%
+    filter(in_policy == 1) %>%
+    dplyr::select(
+      mrun, codigo_carrera_assigned_fin, female, private, voucher, public,
+      MATE1_MAX, CLEC_MAX, PROMEDIO_CM_MAX, CODIGO_REGION_DOMICILIO
+    ) %>%
+    dplyr::rename(
+      codigo_carrera = codigo_carrera_assigned_fin,
+      math = MATE1_MAX, verbal = CLEC_MAX, avg_math_verval = PROMEDIO_CM_MAX,
+      region = CODIGO_REGION_DOMICILIO
+    ) %>%
+    dplyr::mutate(type = "fin")
+)
+
+dc %<>% group_by(codigo_carrera, type) %>%
+  dplyr::mutate(program_selectivity = mean(avg_math_verval, na.rm = TRUE)) %>%
+  dplyr::mutate(program_selectivity = ifelse(codigo_carrera == 0, NA, program_selectivity)) %>%
+  ungroup() %>%
+  as.data.frame()
+
+dc <- merge(dc,
+  c23 %>% dplyr::select(
+    codigo_carrera, UNIVERSIDAD, CODIGO_SIES,
+    AREA_CONOCIMIENTO_SIES, AREA_CONOCIMIENTO_OECD, SUBAREA_OECD, CARRERA_GENERICA
+  ),
+  by = "codigo_carrera", all.x = TRUE
+)
+
+write.csv(dc, file.path(output_dir, "data_for_returns_2023.csv"),
+  row.names = FALSE, fileEncoding = "UTF-8", sep = ";"
+)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+dov <- rbind(
+  d22 %>% filter(in_rct == 0 & in_survey == 1 & !is.na(apps_fin)) %>% filter(Progress == 100 & responded_survey == 1 & apps_fin < 10 & pace != "PACE"),
+  d22 %>%
+    filter(in_rct == 1 & in_survey == 1 & !is.na(apps_fin)) %>%
+    filter(Progress == 100 & responded_survey == 1 & apps_fin < 10 & pace != "PACE" & treatment %in% c(1, 4))
+) %>%
+  dplyr::mutate(
+    misreport_bottom_true = ifelse(!is.na(applied_to_bottom_true_fin), as.numeric(applied_to_bottom_true_fin == 0), 0),
+    over_confidence_exante_lower = ifelse(marca_bottom_true == 25 & overall_ratex_fin < 0.99 & prob_ratex_bottom_true > 0.01, 1, 0),
+    over_confidence_exante_lower = ifelse(is.na(over_confidence_exante_lower), 0, over_confidence_exante_lower),
+    over_confidence_expost_lower = ifelse(marca_bottom_true == 25 & overall_ratex_fin < 0.99 & puntpond_bottom_true > ifelse(bea == "BEA", cutoffs_bea_bottom_true, cutoffs_reg_bottom_true) & assigned_fin == 0, 1, 0),
+    over_confidence_expost_lower = ifelse(is.na(over_confidence_expost_lower), 0, over_confidence_expost_lower)
+  )
+```
+
+
+# Table 1 - Summary of mistakes
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+df <- d20 %>%
+  filter(finished == "True" & is.na(PACE) & inconsistent_type == 0 & short_list_lab == "Short-list" & rand_money == 1) %>%
+  dplyr::mutate(exante = exante_mp, expost = expost_mp) %>%
+  ungroup() %>%
+  as.data.frame()
+
+stats <- rbind(
+  data.frame(
+    type = "Misreport - Exclude",
+    n = sum(df$misreport_exclude == 1),
+    pct = 100 * sum(df$misreport_exclude == 1) / nrow(df)
+  ),
+  data.frame(
+    type = "Ex-Ante Under-confidence Mistake",
+    n = sum(df$misreport_exclude == 1 & df$exante >= 0.01, na.rm = TRUE),
+    pct = 100 * sum(df$misreport_exclude == 1 & df$exante >= 0.01, na.rm = TRUE) / sum(df$misreport_exclude == 1)
+  ),
+  data.frame(
+    type = "Ex-Post Under-confidence Mistake",
+    n = sum(df$misreport_exclude == 1 & df$expost == 1, na.rm = TRUE),
+    pct = 100 * sum(df$misreport_exclude == 1 & df$expost == 1, na.rm = TRUE) / sum(df$misreport_exclude == 1)
+  ),
+  data.frame(
+    type = "Misreport - Order",
+    n = sum(df$misreport_order == 1),
+    pct = 100 * sum(df$misreport_order == 1) / nrow(df)
+  ),
+  data.frame(
+    type = "Ex-Ante Ordering Mistake",
+    n = sum(df$misreport_order == 1 & df$exante >= 0.01, na.rm = TRUE),
+    pct = 100 * sum(df$misreport_order == 1 & df$exante >= 0.01, na.rm = TRUE) / sum(df$misreport_order == 1)
+  ),
+  data.frame(
+    type = "Ex-Post Ordering Mistake",
+    n = sum(df$misreport_order == 1 & df$expost == 1, na.rm = TRUE),
+    pct = 100 * sum(df$misreport_order == 1 & df$expost == 1, na.rm = TRUE) / sum(df$misreport_order == 1)
+  ),
+  data.frame(
+    type = "Misreport - Exclude",
+    n = sum(dov$misreport_bottom_true),
+    pct = 100 * sum(dov$misreport_bottom_true) / nrow(dov)
+  ),
+  data.frame(
+    type = "Ex-Ante Over-confidence Mistake",
+    n = sum(dov$over_confidence_exante_lower == 1, na.rm = TRUE),
+    pct = 100 * sum(dov$over_confidence_exante_lower == 1, na.rm = TRUE) / sum(dov$misreport_bottom_true)
+  ),
+  data.frame(
+    type = "Ex-Post Over-confidence Mistake",
+    n = sum(dov$over_confidence_expost_lower == 1, na.rm = TRUE),
+    pct = 100 * sum(dov$over_confidence_expost_lower == 1, na.rm = TRUE) / sum(dov$misreport_bottom_true)
+  )
+)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# Table 1 is written to a standalone .tex file that the paper \input's.
+# The LaTeX scaffolding is written explicitly; the panel sample sizes and the
+# nine data rows are computed.
+# Rows 1, 4 and 7 are category totals; the rest are indented sub-rows.
+t1_row <- function(i, indent) sprintf(
+  "%s%s & %d & %.2f\\\\", indent, stats$type[i], stats$n[i], stats$pct[i]
+)
+t1_indent <- c("", "\\quad ", "\\quad ", "", "\\quad ", "\\quad ", "", "\\quad ", "\\quad ")
+
+t1 <- c(
+  "\\begin{table}[htp!]",
+  "\\caption{Prevalence of Mistakes on Admission Probabilities}",
+  "\\label{tab: prevalence mistakes}",
+  "\\centering",
+  "\\footnotesize",
+  "\\begin{threeparttable}",
+  "\\renewcommand{\\arraystretch}{1.2}",
+  "\\def\\sym#1{\\ifmmode^{#1}\\else\\(^{#1}\\)\\fi}",
+  "\\begin{tabular}{L{5.5cm} *{2}{C{2.5cm}}}",
+  "\\toprule",
+  "& N & \\% \\\\",
+  "\\hline",
+  sprintf("\\multicolumn{1}{c}{Panel A: Top-True Preferences (N=%s)} & &\\\\",
+          format(nrow(df), big.mark = ",")),
+  "\\hline",
+  sapply(1:6, function(i) t1_row(i, t1_indent[i])),
+  "\\hline",
+  sprintf("\\multicolumn{1}{c}{Panel B: Bottom-True Preferences (N=%s)} & &\\\\",
+          format(nrow(dov), big.mark = ",")),
+  "\\hline",
+  sapply(7:9, function(i) t1_row(i, t1_indent[i])),
+  "\\hline",
+  "\\hline",
+  "\\end{tabular}",
+  "\\begin{tablenotes}",
+  "\\item \\scriptsize \\textsc{Notes.} This table provides lower-bounds on the share of students making different types of mistakes. Panel A is restricted to the sample of short-list students who were asked about their top-true preference (2020 survey), while panel B focuses on students who were asked about their bottom-true preference (2022 survey). In both cases, we include all short-list survey respondents who completed the survey, provided consistent answers regarding their true top preference, and are not PACE.",
+  "\\end{tablenotes}",
+  "\\end{threeparttable}",
+  "\\end{table}"
+)
+writeLines(t1, file.path(table_dir, "prevalence_mistakes.tex"))
+```
+
+\input{outputs/tables/prevalence_mistakes.tex}
+
+# Table 2 - Effect of bias
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+daux <- d20 %>%
+  filter(finished == "True" & inconsistent_type == 0 & is.na(PACE) & !is.na(mp_carr) & short_list == 1 & valid_mp == 1 & rand_money == 1) %>%
+  dplyr::mutate(mistake_type = ifelse(as.character(mistake_type) %in% c("Underconfidence", "Ordering"), as.character(mistake_type), "No mistake")) %>%
+  mutate(
+    report_truth = ifelse(report_type == "Truth", 1, 0),
+    report_exclude = ifelse(report_type == "Exclude", 1, 0),
+    report_order = ifelse(report_type == "Order", 1, 0)
+  )
+
+dov2 <- rbind(
+  d22 %>% filter(in_rct == 0 & in_survey == 1 & !is.na(apps_fin)) %>% filter(Progress == 100 & responded_survey == 1 & apps_fin < 10 & pace != "PACE"),
+  d22 %>%
+    filter(in_rct == 1 & in_survey == 1 & !is.na(apps_fin)) %>%
+    filter(Progress == 100 & responded_survey == 1 & apps_fin < 10 & pace != "PACE" & treatment %in% c(1, 4))
+) %>%
+  filter(marca_bottom_true == 25) %>%
+  dplyr::mutate(
+    misreport_bottom_true = ifelse(!is.na(applied_to_bottom_true_fin), as.numeric(applied_to_bottom_true_fin == 0), 0),
+    over_confidence_exante_lower = ifelse(marca_bottom_true == 25 & overall_ratex_fin < 0.99 & prob_ratex_bottom_true > 0.01, 1, 0),
+    over_confidence_exante_lower = ifelse(is.na(over_confidence_exante_lower), 0, over_confidence_exante_lower),
+    over_confidence_expost_lower = ifelse(marca_bottom_true == 25 & overall_ratex_fin < 0.99 & puntpond_bottom_true > ifelse(bea == "BEA", cutoffs_bea_bottom_true, cutoffs_reg_bottom_true) & assigned_fin == 0, 1, 0),
+    over_confidence_expost_lower = ifelse(is.na(over_confidence_expost_lower), 0, over_confidence_expost_lower)
+  ) %>%
+  mutate(
+    bias_any_pos = ifelse(bias_prob_overall > 0, bias_prob_overall, 0),
+    bias_any_neg = ifelse(bias_prob_overall < 0, -bias_prob_overall, 0),
+    bias_bt_pos = ifelse(bias_prob_bottom_true > 0, bias_prob_bottom_true, 0),
+    bias_bt_neg = ifelse(bias_prob_bottom_true < 0, -bias_prob_bottom_true, 0)
+  )
+
+m_under <- lm(underconfidence_expost_mp ~ bias_mp_pos + bias_mp_neg + factor(strata_score) + factor(strata_sexo) + factor(strata_region), data = daux)
+m_order <- lm(ordering_expost_mp ~ bias_mp_pos + bias_mp_neg + factor(strata_score) + factor(strata_sexo) + factor(strata_region), data = daux)
+m_over_all <- lm(over_confidence_expost_lower ~ bias_any_pos + bias_any_neg + factor(strata_score) + factor(strata_sexo) + factor(strata_region), data = dov2)
+m_over_bot <- lm(over_confidence_expost_lower ~ bias_bt_pos + bias_bt_neg + factor(strata_score) + factor(strata_sexo) + factor(strata_region), data = dov2)
+
+means <- as.character(round(c(mean(daux$underconfidence_expost_mp), mean(daux$ordering_expost_mp), mean(dov2$over_confidence_expost_lower), mean(dov2$over_confidence_expost_lower)), 3))
+
+# Table 2 is written to a standalone .tex file that the paper \input's.
+# stargazer supplies the coefficient rows and the summary lines; the header,
+# float and notes are written explicitly. Constant and R-squared are not
+# reported.
+t2_raw <- capture.output(
+  stargazer(m_under, m_order, m_over_bot, m_over_all,
+    type = "latex", style = "aer",
+    header = FALSE, digits = 3,
+    omit = c("strata_score", "strata_sexo", "strata_region"),
+    covariate.labels = c("Optimism Bias - Top True", "Pessimism Bias - Top True", "Optimism Bias - Bottom True", "Pessimism Bias - Bottom True", "Optimism Bias - Overall", "Pessimism Bias - Overall"),
+    dep.var.labels = c("Underconfidence", "Ordering", "Overconfidence - Bottom True", "Overconfidence - Overall"),
+    keep.stat = c("n", "rsq"),
+    add.lines = list(
+      c("Demographics", "Yes", "Yes", "Yes", "Yes"),
+      c("Mean", means)
+    ),
+    no.space = TRUE, float = FALSE,
+    notes = c(""), notes.append = FALSE, notes.align = "l"
+  )
+)
+
+# A coefficient occupies two consecutive lines: the estimate and its
+# standard error. Take both, keyed off the label stargazer printed.
+t2_pair <- function(lbl) {
+  i <- grep(paste0("^\\s*", lbl, " &"), t2_raw)[1]
+  stopifnot(!is.na(i))
+  t2_raw[c(i, i + 1)]
+}
+t2_line <- function(lbl) {
+  x <- grep(paste0("^\\s*", lbl, " &"), t2_raw, value = TRUE)[1]
+  stopifnot(!is.na(x))
+  x
+}
+
+t2 <- c(
+  "\\begin{table}[htp!]",
+  "\\caption{Effect of Biased Beliefs on Mistakes on Admission Probabilities}\\label{tab:effect_bias_mistakes}",
+  "\\centering",
+  "\\footnotesize",
+  "\\begin{threeparttable}",
+  "\\renewcommand{\\arraystretch}{1.2}",
+  "\\def\\sym#1{\\ifmmode^{#1}\\else\\(^{#1}\\)\\fi}",
+  "\\begin{tabular}{@{\\extracolsep{5pt}}lcccc}",
+  "\\toprule",
+  "& Underconfidence & Ordering & \\multicolumn{2}{c}{Overconfidence} \\\\",
+  "& (1) & (2) & (3) & (4)\\\\",
+  "\\midrule",
+  unlist(lapply(c(
+    "Optimism Bias - Top True", "Pessimism Bias - Top True",
+    "Optimism Bias - Bottom True", "Pessimism Bias - Bottom True",
+    "Optimism Bias - Overall", "Pessimism Bias - Overall"
+  ), t2_pair)),
+  "\\midrule",
+  t2_line("Mean"),
+  t2_line("Demographics"),
+  t2_line("Observations"),
+  "\\bottomrule",
+  "\\end{tabular}",
+  "\\begin{tablenotes}",
+  "\\item \\scriptsize \\textsc{Notes.} Columns (1) and (2) use data from the 2020 survey, while Columns (3) and (4) use data from the  2022 survey. In both cases, the sample includes all survey respondents who are not PACE, are short-list, provided consistent answers, and reported a top/bottom true preference for which they satisfy the application requirements. Significance reported: \\(^{*}p < 0.1; ^{**}p < 0.05; ^{***}p < 0.01\\).",
+  "\\end{tablenotes}",
+  "\\end{threeparttable}",
+  "\\end{table}"
+)
+writeLines(t2, file.path(table_dir, "effect_bias_mistakes.tex"))
+```
+
+\input{outputs/tables/effect_bias_mistakes.tex}
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, eval=FALSE}
+rbind(
+  data.frame(type = "Top True", bias = dov$bias_prob_top_true),
+  data.frame(type = "Bottom True", bias = dov$bias_prob_bottom_true)
+) %>%
+  ggplot(aes(x = bias, color = type)) +
+  stat_ecdf(geom = "step", size = 1) + # Empirical CDF
+  scale_color_manual(values = c("blue", "red")) + # Custom colors
+  theme_minimal() +
+  labs(
+    title = "Cumulative Distribution of Bias in Income Estimates",
+    x = "Percentage Bias",
+    y = "Cumulative Probability",
+    color = "Variable"
+  )
+```
+
+# Figure 1 - Knowledge about average income (mistakes on valuations)
+
+```{r echo=FALSE, message=FALSE, results='hide'}
+ds <- d22 %>% filter(in_survey == 1)
+stats <- rbind(
+  ds %>% filter(!is.na(info_income_top_reported)) %>% group_by(info_income_top_reported) %>% tally() %>%
+    ungroup() %>% mutate(pct = 100 * n / sum(n), type = "Top Reported") %>% dplyr::rename(response = info_income_top_reported),
+  ds %>% filter(!is.na(info_income_top_true)) %>% group_by(info_income_top_true) %>% tally() %>%
+    ungroup() %>% mutate(pct = 100 * n / sum(n), type = "Top True") %>% dplyr::rename(response = info_income_top_true),
+  ds %>% filter(!is.na(info_income_bottom_reported)) %>% group_by(info_income_bottom_reported) %>% tally() %>%
+    ungroup() %>% mutate(pct = 100 * n / sum(n), type = "Bottom Reported") %>% dplyr::rename(response = info_income_bottom_reported),
+  ds %>% filter(!is.na(info_income_bottom_true)) %>% group_by(info_income_bottom_true) %>% tally() %>%
+    ungroup() %>% mutate(pct = 100 * n / sum(n), type = "Bottom True") %>% dplyr::rename(response = info_income_bottom_true),
+  ds %>% filter(!is.na(info_income_random_program)) %>% group_by(info_income_random_program) %>% tally() %>%
+    ungroup() %>% mutate(pct = 100 * n / sum(n), type = "Random") %>% dplyr::rename(response = info_income_random_program)
+)
+
+stats %<>% mutate(response_label = ifelse(response == "No creo estar informada/o", "None",
+  ifelse(response == "Levemente informada/o", "Low",
+    ifelse(response == "Medianamente Informada/o", "Medium",
+      ifelse(response == "Bastante informada/o", "High",
+        ifelse(response == "Completamente informada/o", "Full", NA)
+      )
+    )
+  )
+))
+
+
+stats$response_label <- factor(stats$response_label, levels = c("None", "Low", "Medium", "High", "Full"))
+stats$type <- factor(stats$type, levels = c("Top Reported", "Top True", "Bottom Reported", "Bottom True", "Random"))
+```
+
+```{r echo=FALSE, warning=FALSE, fig.width=6,fig.height=4, fig.align="center", fig.cap="Learning"}
+blues <- brewer.pal(6, "Greys")
+fig2 <- stats %>% ggplot(aes(x = type, y = pct, fill = response_label)) +
+  geom_col(width = 0.75, position = position_dodge(0.75)) +
+  scale_fill_manual(values = blues[-1]) +
+  # zero baseline, with headroom so the tallest bar does not reach the panel edge
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom", legend.title = element_blank(),
+    panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  labs(y = "Percentage [%]", x = "Level of Information about Average Income")
+print(fig2)
+# Figure 2 of the paper is this file. cairo_pdf embeds the fonts.
+dir.create(file.path(output_dir, "figures"), recursive = TRUE, showWarnings = FALSE)
+ggsave(file.path(output_dir, "figures", "knowledge_avg_income.pdf"), fig2,
+       width = 6, height = 4, units = "in", device = cairo_pdf)
+```
+
+
+# Table A.1: summary statistics
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+stats <- rbind(
+  d20 %>% filter(applied_2020 == 1) %>% dplyr::summarise(
+    year = 2020, type = "Applied", n = n(), rid = 1,
+    female = mean(female, na.rm = TRUE), income = mean(income_below_median, na.rm = TRUE), lm = mean(avg_lm, na.rm = TRUE),
+    public = mean(public, na.rm = TRUE), voucher = mean(voucher, na.rm = TRUE), private = mean(private, na.rm = TRUE)
+  ),
+  d20 %>% filter(applied_2020 == 1) %>% dplyr::summarise(
+    year = 2020, type = "Applied", n = n(), rid = 2,
+    female = sd(female, na.rm = TRUE), income = sd(income_below_median, na.rm = TRUE), lm = sd(avg_lm, na.rm = TRUE),
+    public = sd(public, na.rm = TRUE), voucher = sd(voucher, na.rm = TRUE), private = sd(private, na.rm = TRUE)
+  ),
+  d20 %>% filter(finished == "True") %>% dplyr::summarise(
+    year = 2020, type = "Surveyed", n = n(), rid = 1,
+    female = mean(female, na.rm = TRUE), income = mean(income_below_median, na.rm = TRUE), lm = mean(avg_lm, na.rm = TRUE),
+    public = mean(public, na.rm = TRUE), voucher = mean(voucher, na.rm = TRUE), private = mean(private, na.rm = TRUE)
+  ),
+  d20 %>% filter(finished == "True") %>% dplyr::summarise(
+    year = 2020, type = "Surveyed", n = n(), rid = 2,
+    female = sd(female, na.rm = TRUE), income = sd(income_below_median, na.rm = TRUE), lm = sd(avg_lm, na.rm = TRUE),
+    public = sd(public, na.rm = TRUE), voucher = sd(voucher, na.rm = TRUE), private = sd(private, na.rm = TRUE)
+  ),
+  d22 %>% filter(applied_of == 1) %>% dplyr::summarise(
+    year = 2022, type = "Applied", n = n(), rid = 1,
+    female = mean(female, na.rm = TRUE), income = mean(income_below_median, na.rm = TRUE), lm = mean(promlm, na.rm = TRUE),
+    public = mean(public, na.rm = TRUE), voucher = mean(voucher, na.rm = TRUE), private = mean(private, na.rm = TRUE)
+  ),
+  d22 %>% filter(applied_of == 1) %>% dplyr::summarise(
+    year = 2022, type = "Applied", n = n(), rid = 2,
+    female = sd(female, na.rm = TRUE), income = sd(income_below_median, na.rm = TRUE), lm = sd(promlm, na.rm = TRUE),
+    public = sd(public, na.rm = TRUE), voucher = sd(voucher, na.rm = TRUE), private = sd(private, na.rm = TRUE)
+  ),
+  d22 %>% filter(in_survey == 1) %>% dplyr::summarise(
+    year = 2022, type = "Surveyed", n = n(), rid = 1,
+    female = mean(female, na.rm = TRUE), income = mean(income_below_median, na.rm = TRUE), lm = mean(promlm, na.rm = TRUE),
+    public = mean(public, na.rm = TRUE), voucher = mean(voucher, na.rm = TRUE), private = mean(private, na.rm = TRUE)
+  ),
+  d22 %>% filter(in_survey == 1) %>% dplyr::summarise(
+    year = 2022, type = "Surveyed", n = n(), rid = 2,
+    female = sd(female, na.rm = TRUE), income = sd(income_below_median, na.rm = TRUE), lm = sd(promlm, na.rm = TRUE),
+    public = sd(public, na.rm = TRUE), voucher = sd(voucher, na.rm = TRUE), private = sd(private, na.rm = TRUE)
+  ),
+  d23 %>% filter(applied_of == 1) %>% dplyr::summarise(
+    year = 2023, type = "Applied", n = n(), rid = 1,
+    female = mean(female, na.rm = TRUE), income = mean(income_below_median, na.rm = TRUE), lm = mean(promlm, na.rm = TRUE),
+    public = mean(public, na.rm = TRUE), voucher = mean(voucher, na.rm = TRUE), private = mean(private, na.rm = TRUE)
+  ),
+  d23 %>% filter(applied_of == 1) %>% dplyr::summarise(
+    year = 2023, type = "Applied", n = n(), rid = 2,
+    female = sd(female, na.rm = TRUE), income = sd(income_below_median, na.rm = TRUE), lm = sd(promlm, na.rm = TRUE),
+    public = sd(public, na.rm = TRUE), voucher = sd(voucher, na.rm = TRUE), private = sd(private, na.rm = TRUE)
+  ),
+  d23 %>% filter(in_survey_before_after == 1) %>% dplyr::summarise(
+    year = 2023, type = "Surveyed", n = n(), rid = 1,
+    female = mean(female, na.rm = TRUE), income = mean(income_below_median, na.rm = TRUE), lm = mean(promlm, na.rm = TRUE),
+    public = mean(public, na.rm = TRUE), voucher = mean(voucher, na.rm = TRUE), private = mean(private, na.rm = TRUE)
+  ),
+  d23 %>% filter(in_survey_before_after == 1) %>% dplyr::summarise(
+    year = 2023, type = "Surveyed", n = n(), rid = 2,
+    female = sd(female, na.rm = TRUE), income = sd(income_below_median, na.rm = TRUE), lm = sd(promlm, na.rm = TRUE),
+    public = sd(public, na.rm = TRUE), voucher = sd(voucher, na.rm = TRUE), private = sd(private, na.rm = TRUE)
+  )
+) %>%
+  arrange(year, type, rid) %>%
+  as.data.frame() %>%
+  dplyr::mutate(across(where(is.numeric), ~ ifelse(. %% 1 == 0, ., round(., 3)))) %>%
+  dplyr::mutate(
+    year = ifelse(rid == 2, "", ifelse(type == "Applied", paste("\\multirow{4}{*}{", year, "}"), "")),
+    type = ifelse(rid == 2, "", paste("\\multirow{2}{*}{", type, "}")),
+    n = ifelse(rid == 2, "", paste("\\multirow{2}{*}{", n, "}")),
+    female = ifelse(rid == 2, paste0("(", female, ")"), female),
+    income = ifelse(rid == 2, paste0("(", income, ")"), income),
+    lm = ifelse(rid == 2, paste0("(", lm, ")"), lm),
+    public = ifelse(rid == 2, paste0("(", public, ")"), public),
+    voucher = ifelse(rid == 2, paste0("(", voucher, ")"), voucher),
+    private = ifelse(rid == 2, paste0("(", private, ")"), private)
+  ) %>%
+  dplyr::select(-rid)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# Table A.1 is written to a standalone .tex file that the paper \input's.
+# linesep supplies the paper's separators: a \cmidrule after each Applied
+# pair and a \midrule between year blocks. knitr omits the separator after
+# the final row, which matches the paper.
+a1_tbl <- kable(stats,
+  "latex",
+  table.envir = NULL,
+  booktabs = T,
+  col.names = c("Year", "Group", "N", "Female", "Low-Income", "Avg. Math-Verbal", "Public", "Voucher", "Private"),
+  linesep = c("", "\\cmidrule{2-9}", "", "\\midrule"),
+  align = c("l", "l", "c", "c", "c", "c", "c", "c", "c"),
+  row.names = FALSE,
+  escape = F,
+  digits = 3
+) %>%
+  add_header_above(c(" " = 3, " Demographics and Scores " = 3, "High-School Type" = 3))
+
+a1 <- c(
+  "\\begin{table}[H]",
+  "\\caption{\\label{tab:general summary stats applicants and survey} Summary Statistics Applicants and Survey}",
+  "\\centerline{\\scalebox{0.8}{",
+  # kable emits \begin{tabular}[t]{...} only when a caption is passed;
+  # the caption is supplied by the wrapper above, so restore [t] here.
+  sub("\\begin{tabular}{", "\\begin{tabular}[t]{",
+      as.character(a1_tbl), fixed = TRUE),
+  "}}",
+  "\\vspace{0.2cm}{\\footnotesize \\emph{Note:} Summary statistics for the 2020, 2022 and 2023 applicants and surveyed students. Applicants data considers all students who applied to at least one program in their corresponding year. Survey data considers all students who completed their corresponding survey. For 2023, we consider students who completed both baseline and endline surveys.  }",
+  "\\end{table}"
+)
+writeLines(a1, file.path(table_dir, "summary_stats_applicants_survey.tex"))
+```
+
+\input{outputs/tables/summary_stats_applicants_survey.tex}
+
+
+# Table A.2. - Bias in admission probabilities and cutoffs
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+demo_vars <- c("strata_score", "strata_egreso", "strata_sexo", "strata_region", "public", "voucher", "private", "income_below_median", "female", "nem", "ranking", "language", "math", "avg_lm")
+
+df <- d20 %>%
+  filter(finished == "True" & is.na(PACE)) %>%
+  ungroup() %>%
+  dplyr::mutate(
+    codigo_carrera_0 = codigo_carrera_mp,
+    marca_0 = marca_mp,
+    puntpond_0 = puntpond_mp,
+    exante_0 = exante_mp,
+    expost_0 = expost_mp,
+    adaptive_exante_0 = adaptive_exante_mp,
+    adaptive_expost_0 = adaptive_expost_mp,
+    COD_CARRERA_PREF_0 = mp_carr,
+    PTJE_PREF_0 = pp_mp,
+    ESTADO_PREF_0 = marca_mp,
+    cutoff_pref_0 = cutoff_mp,
+    cutoff_0 = mp_cutoff_belief,
+    prob_0 = mp_prob,
+    nw_0 = NA,
+    req_knows_share = rowMeans(select(., starts_with("req_knows_")), na.rm = TRUE)
+  ) %>%
+  select(-starts_with("prob_remain_"), -starts_with("prob_err"), -c("prob_first")) %>%
+  select(
+    id, n_apps, some_mistake, know_cutoff, req_knows_share, all_of(demo_vars),
+    starts_with("codigo_carrera_"),
+    starts_with("marca_"),
+    starts_with("puntpond_"),
+    starts_with("exante_"),
+    starts_with("expost_"),
+    starts_with("adaptive_exante_"),
+    starts_with("adaptive_expost_"),
+    starts_with("COD_CARRERA_PREF_"),
+    starts_with("ESTADO_PREF_"),
+    starts_with("PTJE_PREF_"),
+    starts_with("prob_"),
+    starts_with("cutoff_pref_"),
+    starts_with("cutoff_"),
+    starts_with("nw_")
+  ) %>%
+  dplyr::rename_with(~ str_replace(., "_0([1-9])$", "_\\1")) %>%
+  pivot_longer(
+    cols = -c(id, n_apps, some_mistake, know_cutoff, req_knows_share, all_of(demo_vars)), # Keep these columns fixed
+    names_to = c(".value", "preference"),
+    names_pattern = "^(.*)_(\\d+)$"
+  ) %>%
+  dplyr::mutate(
+    distance = PTJE_PREF - cutoff_pref,
+    bias_cutoff = cutoff - cutoff_pref,
+    bias_prob = prob / 100 - exante,
+    abs_bias_prob = abs(bias_prob),
+    adaptive_bias_prob = prob / 100 - adaptive_exante,
+    adaptive_abs_bias_prob = abs(adaptive_bias_prob),
+    abs_bias_cutoff = abs(bias_cutoff),
+    avg_lm_norm = (avg_lm - 500) / 110,
+  ) %>%
+  filter(!is.na(COD_CARRERA_PREF) & COD_CARRERA_PREF > 0 & !is.na(prob)) %>%
+  dplyr::mutate(
+    know_cutoff_all = ifelse(grepl("para cada una", know_cutoff), 1, 0),
+    know_cutoff_some = ifelse(grepl("para algunas", know_cutoff), 1, 0),
+    know_cutoff_none = ifelse(grepl("para ninguna", know_cutoff), 1, 0)
+  )
+
+means <- df %>%
+  filter(preference > 0 & cutoff_pref > 0) %>%
+  dplyr::summarise(
+    tr = sprintf("%.3f", mean(abs(abs_bias_prob), na.rm = TRUE)),
+    tt = sprintf("%.3f", mean(abs(abs_bias_prob), na.rm = TRUE)),
+    br = sprintf("%.3f", mean(abs(abs_bias_cutoff), na.rm = TRUE)),
+    bt = sprintf("%.3f", mean(abs(abs_bias_cutoff), na.rm = TRUE))
+  ) %>%
+  slice(1) %>%
+  unlist(use.names = FALSE)
+
+lm1 <- lm(abs_bias_prob ~ avg_lm_norm + female + income_below_median + public + voucher, data = df %>% filter(preference > 0 & cutoff_pref > 0))
+lm2 <- lm(abs_bias_prob ~ avg_lm_norm + female + income_below_median + public + voucher + req_knows_share + know_cutoff_all + know_cutoff_some + nw + as.factor(preference) + abs_bias_cutoff, data = df %>% filter(preference > 0 & cutoff_pref > 0))
+lm3 <- lm(abs_bias_cutoff ~ avg_lm_norm + female + income_below_median + public + voucher, data = df %>% filter(preference > 0 & cutoff_pref > 0))
+lm4 <- lm(abs_bias_cutoff ~ avg_lm_norm + female + income_below_median + public + voucher + req_knows_share + know_cutoff_all + know_cutoff_some + nw + as.factor(preference), data = df %>% filter(preference > 0 & cutoff_pref > 0))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# Table A.2 is written to tables/reg_bias_knowledge.tex, the path the paper
+# \input's. stargazer supplies the coefficient rows; the header, float and
+# note are written explicitly. Constant is not reported.
+a2_raw <- capture.output(
+  stargazer(lm1, lm2, lm3, lm4,
+    type = "latex", style = "aer", header = FALSE, digits = 3,
+    omit = c("preference"),
+    covariate.labels = c("Avg. Math-Verbal Normalized", "Female", "Below median income", "Public", "Voucher", "Requirements Knowledge Share", "Knows cutoff for every program", "Knows cutoff for some programs", "Knows someone in the program", "Absolute bias cutoff"),
+    dep.var.labels = c("Abs. Bias Adm. Prob", "Abs. Bias Cutoff"),
+    keep.stat = c("n"), no.space = TRUE, float = FALSE,
+    notes = c(""), notes.append = FALSE, notes.align = "l",
+    add.lines = list(c("Mean", means))
+  )
+)
+
+a2_pair <- function(lbl) {
+  i <- grep(paste0("^\\s*", lbl, " &"), a2_raw, fixed = FALSE)[1]
+  stopifnot(!is.na(i))
+  a2_raw[c(i, i + 1)]
+}
+a2_line <- function(lbl) {
+  x <- grep(paste0("^\\s*", lbl, " &"), a2_raw, value = TRUE)[1]
+  stopifnot(!is.na(x))
+  x
+}
+
+a2 <- c(
+  "\\begin{table}",
+  "  \\caption{OLS regression for Bias Norms over Adm. Probabilities and Cutoffs}",
+  "  \\label{tab:reg_bias_knowledge}",
+  "\\centerline{\\scalebox{0.8}{",
+  "\\begin{tabular}{@{\\extracolsep{5pt}}lcccc}",
+  "\\toprule",
+  "& \\multicolumn{2}{c}{Abs. Bias Adm. Prob} & \\multicolumn{2}{c}{Abs. Bias Cutoff} \\\\",
+  "\\cmidrule(lr){2-3} \\cmidrule(lr){4-5}",
+  "& (1) & (2) & (3) & (4)\\\\",
+  "\\midrule",
+  unlist(lapply(c(
+    "Avg. Math-Verbal Normalized",
+    "Female",
+    "Below median income",
+    "Public",
+    "Voucher",
+    "Requirements Knowledge Share",
+    "Knows cutoff for every program",
+    "Knows cutoff for some programs",
+    "Knows someone in the program",
+    "Absolute bias cutoff"
+  ), a2_pair)),
+  "\\midrule",
+  a2_line("Mean"),
+  a2_line("Observations"),
+  "\\bottomrule",
+  "\\end{tabular}",
+  "}}",
+  "\\vspace{0.2cm}{\\footnotesize \\emph{Note:} Each observation represents a student-program pair where the student is not PACE and completed the 2020 survey, the program has a cutoff, and the student either (i) included the program in their preference list or (ii) reported it as their top-true preference. Requirement Knowledge Share is the fraction of requirements the student claims to know for the applied program. Knows the cutoffs for every (some) program is a dummy variable indicating whether the student knows the cutoffs for all (some) programs. Knows someone in the program is a dummy for knowing someone in the program. Abs. Bias Adm. Prob. (Abs. Bias Cutoff) is the absolute value of the bias (cutoff) for the program’s admission probability. Models (2) and (4) also control for the position of the program in the student's preference list. Significance reported: $^{*}p < 0.1;\\; ^{**}p < 0.05;\\; ^{***}p < 0.01$}",
+  "\\end{table}"
+)
+writeLines(a2, file.path(table_dir, "reg_bias_knowledge.tex"))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+c19 <- read.csv(file.path(data_dir, "carreras_2019.csv"), sep = ";")
+c20 <- read.csv(file.path(data_dir, "carreras_2020.csv"), sep = ";")
+cmg <- merge(c20 %>% dplyr::mutate(VACANTES_TOTALES_20 = rowSums(across(c(VAC_1SEM, VAC_2SEM, SC_1SEM, SC_2SEM)), na.rm = TRUE)) %>% dplyr::select(CODIGO, VACANTES_TOTALES_20),
+  c19 %>% dplyr::mutate(VACANTES_TOTALES_19 = rowSums(across(c(VAC_1SEM, VAC_2SEM, SC_1SEM, SC_2SEM)), na.rm = TRUE)) %>% dplyr::select(CODIGO, VACANTES_TOTALES_19),
+  by = "CODIGO", all.x = TRUE
+)
+cmg %<>% dplyr::mutate(pct_changed_VAC_TOT = (VACANTES_TOTALES_20 - VACANTES_TOTALES_19) / VACANTES_TOTALES_19)
+
+df <- merge(df, cmg, by.x = "COD_CARRERA_PREF", by.y = "CODIGO", all.x = TRUE)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, eval=FALSE}
+rbind(
+  data.frame(type = "Adaptive", bias = df %>% pull(adaptive_bias_prob)),
+  data.frame(type = "Ratex", bias = df %>% pull(bias_prob))
+) %>%
+  ggplot(aes(x = bias, color = type)) +
+  stat_ecdf(geom = "step", size = 1) + # Empirical CDF
+  scale_color_manual(values = c("blue", "red")) + # Custom colors
+  theme_minimal() +
+  labs(
+    title = "Cumulative Distribution of Bias in Adm. Prob.",
+    x = "Bias",
+    y = "Cumulative Probability",
+    color = "Variable"
+  )
+
+rbind(
+  data.frame(type = "Adaptive", bias = df %>% filter(pct_changed_VAC_TOT > 0.25) %>% pull(adaptive_bias_prob)),
+  data.frame(type = "Ratex", bias = df %>% filter(pct_changed_VAC_TOT > 0.25) %>% pull(bias_prob))
+) %>%
+  ggplot(aes(x = bias, color = type)) +
+  stat_ecdf(geom = "step", size = 1) + # Empirical CDF
+  scale_color_manual(values = c("blue", "red")) + # Custom colors
+  theme_minimal() +
+  labs(
+    title = "Cumulative Distribution of Bias in Adm. Prob.",
+    x = "Bias",
+    y = "Cumulative Probability",
+    color = "Variable"
+  )
+
+rbind(
+  data.frame(type = "Adaptive", bias = df %>% filter(pct_changed_VAC_TOT < -0.25) %>% pull(adaptive_bias_prob)),
+  data.frame(type = "Ratex", bias = df %>% filter(pct_changed_VAC_TOT < -0.25) %>% pull(bias_prob))
+) %>%
+  ggplot(aes(x = bias, color = type)) +
+  stat_ecdf(geom = "step", size = 1) + # Empirical CDF
+  scale_color_manual(values = c("blue", "red")) + # Custom colors
+  theme_minimal() +
+  labs(
+    title = "Cumulative Distribution of Bias in Adm. Prob.",
+    x = "Bias",
+    y = "Cumulative Probability",
+    color = "Variable"
+  )
+```
+
+### Table  A.3 - Regression Bias income average
+```{r echo=FALSE, message=FALSE, results='hide'}
+ds <- d22 %>% filter(in_survey == 1)
+tr <- lm(abs(pct_bias_income_avg_top_reported) ~ promlm_norm + female + income_below_median + public + voucher, data = ds %>% filter(in_rct == 0 | open == 0))
+tt <- lm(abs(pct_bias_income_avg_top_true) ~ promlm_norm + female + income_below_median + public + voucher, data = ds %>% filter(in_rct == 0 | open == 0))
+br <- lm(abs(pct_bias_income_avg_bottom_reported) ~ promlm_norm + female + income_below_median + public + voucher, data = ds %>% filter(in_rct == 0 | open == 0))
+bt <- lm(abs(pct_bias_income_avg_bottom_true) ~ promlm_norm + female + income_below_median + public + voucher, data = ds %>% filter(in_rct == 0 | open == 0))
+rd <- lm(abs(pct_bias_income_avg_random) ~ promlm_norm + female + income_below_median + public + voucher, data = ds %>% filter(in_rct == 0 | open == 0))
+
+means <- ds %>%
+  filter(in_rct == 0 | open == 0) %>%
+  dplyr::summarise(
+    tr = sprintf("%.3f", mean(abs(pct_bias_income_avg_top_reported), na.rm = TRUE)),
+    tt = sprintf("%.3f", mean(abs(pct_bias_income_avg_top_true), na.rm = TRUE)),
+    br = sprintf("%.3f", mean(abs(pct_bias_income_avg_bottom_reported), na.rm = TRUE)),
+    bt = sprintf("%.3f", mean(abs(pct_bias_income_avg_bottom_true), na.rm = TRUE)),
+    rd = sprintf("%.3f", mean(abs(pct_bias_income_avg_random), na.rm = TRUE))
+  ) %>%
+  slice(1) %>%
+  unlist(use.names = FALSE)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# Table A.3 is written to a standalone .tex file that the paper \input's.
+# stargazer supplies the coefficient rows; the spanning header, float, scale
+# and note are written explicitly. Constant and R-squared are not reported.
+a3_raw <- capture.output(
+  stargazer(tr, tt, br, bt, rd,
+    style = "aer", header = FALSE, digits = 3,
+    dep.var.labels.include = FALSE,
+    covariate.labels = c("Avg. Math-Verbal normalized", "Female", "Family income below median", "Public", "Voucher", "Constant"),
+    column.labels = c("Top Reported", "Top True", "Bottom Reported", "Bottom True", "Random"),
+    keep.stat = c("n", "rsq"),
+    no.space = TRUE, float = FALSE,
+    notes = c(""), notes.append = FALSE,
+    add.lines = list(c("Mean", means))
+  )
+)
+
+a3_pair <- function(lbl) {
+  i <- grep(paste0("^\\s*", lbl, " &"), a3_raw)[1]
+  stopifnot(!is.na(i))
+  a3_raw[c(i, i + 1)]
+}
+a3_line <- function(lbl) {
+  x <- grep(paste0("^\\s*", lbl, " &"), a3_raw, value = TRUE)[1]
+  stopifnot(!is.na(x))
+  x
+}
+
+a3 <- c(
+  "\\begin{table}[htp!] \\centering",
+  "\\caption{Regression Results for Absolute Bias on Average Income}",
+  "\\label{tab: bias abs in income}",
+  "\\centerline{\\scalebox{0.85}{\\begin{tabular}{lccccc}",
+  "\\toprule",
+  "& \\multicolumn{5}{c}{Percentage of Absolute Bias in Average Income}\\\\",
+  "\\cmidrule(lr){2-6}",
+  "& Top Reported & Top True & Bottom Reported & Bottom True & Random \\\\",
+  "& (1) & (2) & (3) & (4) & (5)\\\\",
+  "\\midrule",
+  unlist(lapply(c(
+    "Avg. Math-Verbal normalized", "Female",
+    "Family income below median", "Public", "Voucher"
+  ), a3_pair)),
+  "\\midrule",
+  a3_line("Mean"),
+  a3_line("Observations"),
+  "\\bottomrule",
+  "\\end{tabular} }}",
+  "",
+  "{\\footnotesize Note: Sample includes all students who completed the survey and did not receive the intervention. Significance reported: \\(^{*} p < 0.1; ^{**} p<0.05; ^{***} p<0.01\\). }",
+  "\\end{table}"
+)
+writeLines(a3, file.path(table_dir, "bias_abs_income.tex"))
+```
+
+\input{outputs/tables/bias_abs_income.tex}
+
+## Table A.4.: mistakes by truth-tellers
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+dmt <- rbind(
+  d22 %>% filter(in_rct == 0 & in_survey == 1 & !is.na(apps_fin)) %>% filter(Progress == 100 & responded_survey == 1 & apps_fin == 10 & pace != "PACE" & applied_to_top_true_fin == 1),
+  d22 %>%
+    filter(in_rct == 1 & in_survey == 1 & !is.na(apps_fin)) %>%
+    filter(Progress == 100 & responded_survey == 1 & apps_fin == 10 & pace != "PACE" & treatment %in% c(1, 4) & applied_to_top_true_fin == 1)
+) %>%
+  dplyr::mutate(
+    misreport_bottom_true = ifelse(!is.na(applied_to_bottom_true_fin), as.numeric(applied_to_bottom_true_fin == 0), 0),
+    any_program_with_zero_prob_fin = as.integer(rowSums(across(starts_with("prob_ratex_") & ends_with("_fin")) < 1e-3) > 0)
+  )
+
+stats <- dmt %>% dplyr::summarise(
+  n = n(),
+  m2 = sum(any_program_with_zero_prob_fin),
+  p2 = 100 * sum(any_program_with_zero_prob_fin) / n(),
+  m3 = sum(misreport_bottom_true),
+  p3 = 100 * sum(misreport_bottom_true) / n(),
+  exante = sum(misreport_bottom_true & any_program_with_zero_prob_fin & marca_bottom_true == 25 & overall_ratex_fin < 0.99 & prob_ratex_bottom_true > 0.01, 1, 0),
+  pct_exante = 100 * sum(misreport_bottom_true & any_program_with_zero_prob_fin & marca_bottom_true == 25 & overall_ratex_fin < 0.99 & prob_ratex_bottom_true > 0.01, 1, 0) / n(),
+  expost = sum(misreport_bottom_true & any_program_with_zero_prob_fin & marca_bottom_true == 25 & overall_ratex_fin < 0.99 & puntpond_bottom_true > ifelse(bea == "BEA", cutoffs_bea_bottom_true, cutoffs_reg_bottom_true) & assigned_fin == 0, 1, 0),
+  pct_expost = 100 * sum(misreport_bottom_true & any_program_with_zero_prob_fin & marca_bottom_true == 25 & overall_ratex_fin < 0.99 & puntpond_bottom_true > ifelse(bea == "BEA", cutoffs_bea_bottom_true, cutoffs_reg_bottom_true) & assigned_fin == 0, 1, 0) / n()
+)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# Table A.4 is written to a standalone .tex file that the paper \input's.
+# The LaTeX scaffolding below is written explicitly; the numeric row is
+# computed from the data.
+a4_row <- paste(
+  c(
+    stats$n,
+    stats$m2, sprintf("%.3f", stats$p2),
+    stats$m3, sprintf("%.3f", stats$p3),
+    stats$exante, sprintf("%.3f", stats$pct_exante),
+    stats$expost, sprintf("%.3f", stats$pct_expost)
+  ),
+  collapse = " & "
+)
+
+a4 <- c(
+  "\\begin{table}[H]",
+  "\\caption{Mistakes on Truth-Telling}\\label{tab: mistakes by truth-tellers}",
+  "\\centerline{\\scalebox{0.8}{",
+  "\\begin{tabular}[t]{ccccccccc}",
+  "\\toprule",
+  "\\multicolumn{5}{c}{Full-List Truth-Tellers} & \\multicolumn{4}{c}{Mistake by Truth-Telling}\\\\",
+  "\\cmidrule{1-5} \\cmidrule{6-9}",
+  "\\multicolumn{1}{c}{Total} & \\multicolumn{2}{c}{Any zero} & \\multicolumn{2}{c}{Exclude Bottom-True} & \\multicolumn{2}{c}{Ex-Ante} & \\multicolumn{2}{c}{Ex-Post} \\\\",
+  "\\cmidrule(l{3pt}r{3pt}){1-1} \\cmidrule(l{3pt}r{3pt}){2-3} \\cmidrule(l{3pt}r{3pt}){4-5} \\cmidrule(l{3pt}r{3pt}){6-7} \\cmidrule(l{3pt}r{3pt}){8-9}",
+  "N & N & \\% & N & \\% & N & \\% & N & \\%\\\\",
+  "\\midrule",
+  paste0(a4_row, "\\\\ "),
+  "\\bottomrule",
+  "\\end{tabular}",
+  "}}",
+  "\\vspace{0.2cm}{\\footnotesize \\emph{Note:} Sample includes students who completed the survey of 2022, who are not PACE and applied to ten programs including their top true preference (i.e., full-list truth-tellers), and were not part of treatments T2 and T3. The columns under \\emph{Any zero} report the number and fraction of full-list truth-tellers that included at least one program for which they had zero admission chance in their final ROL. The columns under \\emph{Exclude Bottom-True} report the number and fraction of full-list truth-tellers that excluded their bottom-true program. }",
+  "\\end{table}"
+)
+writeLines(a4, file.path(table_dir, "mistakes_truthtelling.tex"))
+```
+
+\input{outputs/tables/mistakes_truthtelling.tex}
+
+
+# Table B.4. Placebo
+```{r placebo_regs, echo=FALSE, message=FALSE, warning=FALSE}
+md <- lm(changed ~ factor(treatment) + factor(strata_sexo) + factor(strata_region) + factor(strata_score) + factor(general_message),
+  data = d22 %>%
+    filter(!is.na(treatment) & in_rct == 1 & open == 0 & misfit == 1) %>%
+    filter(!is.na(codigo_carrera_1_int) & !is.na(codigo_carrera_1_fin)) %>%
+    dplyr::mutate(treatment = ifelse(treatment == 4, 1, treatment))
+)
+ip <- lm(overall_prob_ratex_inc ~ factor(treatment) + factor(strata_sexo) + factor(strata_region) + factor(strata_score) + factor(general_message),
+  data = d22 %>%
+    filter(!is.na(treatment) & in_rct == 1 & open == 0 & misfit == 1) %>%
+    filter(!is.na(codigo_carrera_1_int) & !is.na(codigo_carrera_1_fin)) %>%
+    dplyr::mutate(
+      treatment = ifelse(treatment == 4, 1, treatment),
+      overall_prob_ratex_inc = ifelse(overall_ratex_fin - overall_ratex_int < 0.01, 0, overall_prob_ratex_inc),
+      overall_prob_ratex_inc = ifelse(overall_ratex_int >= 0.99, NA, overall_prob_ratex_inc)
+    )
+)
+im <- lm(improved ~ factor(treatment) + factor(strata_sexo) + factor(strata_region) + factor(strata_score) + factor(general_message),
+  data = d22 %>%
+    filter(!is.na(treatment) & in_rct == 1 & open == 0 & misfit == 1) %>%
+    filter(!is.na(codigo_carrera_1_int) & !is.na(codigo_carrera_1_fin)) %>%
+    dplyr::mutate(treatment = ifelse(treatment == 4, 1, treatment))
+)
+et <- lm(entered ~ factor(treatment) + factor(strata_sexo) + factor(strata_region) + factor(strata_score) + factor(general_message),
+  data = d22 %>%
+    filter(!is.na(treatment) & in_rct == 1 & open == 0 & misfit == 1) %>%
+    filter(!is.na(codigo_carrera_1_int) & !is.na(codigo_carrera_1_fin)) %>%
+    dplyr::mutate(treatment = ifelse(treatment == 4, 1, treatment))
+)
+bp <- lm(impr_ent_persist ~ factor(treatment) + factor(strata_sexo) + factor(strata_region) + factor(strata_score) + factor(general_message),
+  data = d22 %>%
+    filter(!is.na(treatment) & in_rct == 1 & open == 0 & misfit == 1) %>%
+    filter(!is.na(codigo_carrera_1_int) & !is.na(codigo_carrera_1_fin)) %>%
+    dplyr::mutate(
+      treatment = ifelse(treatment == 4, 1, treatment),
+      impr_ent_persist = coalesce(remained_enrolled_2022_2023, 0) * (coalesce(improved, 0) + coalesce(entered, 0))
+    ) %>%
+    dplyr::mutate(impr_ent_persist = ifelse(is.na(improved) & is.na(entered), NA, impr_ent_persist))
+)
+
+means <- d22 %>%
+  filter(!is.na(treatment) & in_rct == 1 & open == 0 & misfit == 1) %>%
+  filter(!is.na(codigo_carrera_1_int) & !is.na(codigo_carrera_1_fin)) %>%
+  dplyr::mutate(
+    treatment = ifelse(treatment == 4, 1, treatment),
+    impr_ent_persist = coalesce(remained_enrolled_2022_2023, 0) * (coalesce(improved, 0) + coalesce(entered, 0))
+  ) %>%
+  dplyr::mutate(impr_ent_persist = ifelse(is.na(improved) & is.na(entered), NA, impr_ent_persist)) %>%
+  filter(treatment == 1) %>%
+  dplyr::summarise(
+    changed = mean(changed, na.rm = TRUE),
+    overall_prob_ratex_inc = mean(overall_prob_ratex_inc, na.rm = TRUE),
+    improved = mean(improved, na.rm = TRUE),
+    entered = mean(entered, na.rm = TRUE),
+    impr_ent_persist = mean(impr_ent_persist, na.rm = TRUE)
+  ) %>%
+  slice(1) %>%
+  unlist(use.names = FALSE)
+```
+
+```{r tabulate_placebo_results, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+out <- capture.output(
+  stargazer(md, ip, im, et, bp,
+    type = "latex",
+    digits = 3,
+    title = "Placebo Test",
+    label = "tab: placebo test",
+    table.placement = "htp!",
+    dep.var.labels.include = TRUE,
+    dep.var.labels = c("Modified", "Incr. Prob.", "Improved", "Entered", "Benefited \\& Persisted"),
+    omit = c("strata_sexo", "strata_region", "strata_score", "general_message"),
+    covariate.labels = c("Treatment 2", "Treatment 3", "Constant"),
+    keep.stat = c("n"),
+    no.space = TRUE,
+    model.names = FALSE,
+    add.lines = list(
+      c("Strata FE", "Yes", "Yes", "Yes", "Yes", "Yes"),
+      c("Mean (Control)", round(means, 3))
+    ),
+    header = FALSE
+  )
+)
+
+# Replace hlines with booktabs rules
+out <- make_clean_table(out, caption = "Placebo Test", label = "tab:placebo", paper_layout = TRUE, header = " & \\multicolumn{2}{c}{Applications} & \\multicolumn{3}{c}{Assignment} \\\\ \n \\cmidrule(lr){2-3} \\cmidrule(lr){4-6}")
+writeLines(out, file.path(table_dir, "placebo.tex"))
+```
+
+\input{outputs/tables/placebo.tex}
+
+# Table B.5. Application withdraw
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+stats <- rbind(
+  d22 %>%
+    filter(!is.na(treatment) & in_rct == 1 & open == 1 & misfit == 1) %>%
+    filter(!is.na(codigo_carrera_1_int)) %>%
+    dplyr::mutate(withdraw = ifelse(applied_of == 0, 1, 0)) %>%
+    filter(!is.na(withdraw)) %>%
+    group_by(treatment) %>%
+    dplyr::summarise(
+      n  = n(),
+      ct = sum(withdraw, na.rm = TRUE),
+      m  = mean(withdraw, na.rm = TRUE),
+      sd = sd(withdraw, na.rm = TRUE)
+    ),
+  d22 %>%
+    filter(!is.na(treatment) & in_rct == 1 & open == 1 & misfit == 1) %>%
+    filter(!is.na(codigo_carrera_1_int)) %>%
+    dplyr::mutate(withdraw = ifelse(applied_of == 0, 1, 0)) %>%
+    filter(!is.na(withdraw)) %>%
+    dplyr::summarise(
+      treatment = "RCT",
+      n = n(),
+      ct = sum(withdraw, na.rm = TRUE),
+      m = mean(withdraw, na.rm = TRUE),
+      sd = sd(withdraw, na.rm = TRUE)
+    ),
+  d23 %>% filter(in_policy == 1 & any_opening == 1) %>%
+    dplyr::mutate(withdraw = ifelse(applied_of == 0, 1, 0)) %>%
+    dplyr::summarise(
+      treatment = "Open",
+      n = n(),
+      ct = sum(withdraw, na.rm = TRUE),
+      m = mean(withdraw, na.rm = TRUE),
+      sd = sd(withdraw, na.rm = TRUE)
+    ),
+  d23 %>% filter(in_policy == 1) %>%
+    dplyr::mutate(withdraw = ifelse(applied_of == 0, 1, 0)) %>%
+    dplyr::summarise(
+      treatment = "Scale-up",
+      n = n(),
+      ct = sum(withdraw, na.rm = TRUE),
+      m = mean(withdraw, na.rm = TRUE),
+      sd = sd(withdraw, na.rm = TRUE)
+    )
+)
+
+
+df_combined <- bind_rows(
+  d22 %>%
+    filter(!is.na(treatment) & in_rct == 1 & open == 1 & misfit == 1) %>%
+    filter(!is.na(codigo_carrera_1_int)) %>%
+    dplyr::mutate(
+      withdraw = ifelse(applied_of == 0, 1, 0),
+      treatment = ifelse(treatment == 4, 1, treatment),
+      group = "RCT"
+    ),
+  d23 %>%
+    filter(in_policy == 1 & any_opening == 1) %>%
+    dplyr::mutate(
+      withdraw = ifelse(applied_of == 0, 1, 0),
+      group = "Scale-up"
+    )
+)
+tt <- t.test(withdraw ~ group, data = df_combined)
+
+m1 <- lm(withdraw ~ factor(treatment), data = d22 %>%
+  filter(!is.na(treatment) & in_rct == 1 & open == 1 & misfit == 1) %>%
+  filter(!is.na(codigo_carrera_1_int)) %>%
+  dplyr::mutate(
+    withdraw = ifelse(applied_of == 0, 1, 0),
+    treatment = ifelse(treatment == 4, 1, treatment)
+  ))
+
+m2 <- lm(withdraw ~ factor(treatment) + factor(strata_sexo) + factor(strata_region) + factor(strata_score), data = d22 %>%
+  filter(!is.na(treatment) & in_rct == 1 & open == 1 & misfit == 1) %>%
+  filter(!is.na(codigo_carrera_1_int)) %>%
+  dplyr::mutate(
+    withdraw = ifelse(applied_of == 0, 1, 0),
+    treatment = ifelse(treatment == 4, 1, treatment)
+  ))
+
+iv1 <- ivreg(
+  withdraw ~ any_opening | recibe_whatsapp,
+  data = d23 %>%
+    filter(in_policy == 1) %>%
+    dplyr::mutate(withdraw = ifelse(applied_of == 0, 1, 0))
+)
+
+iv2 <- ivreg(
+  withdraw ~ factor(strata_sexo) + factor(strata_region) + factor(strata_score) + any_opening | factor(strata_sexo) + factor(strata_region) + factor(strata_score) + recibe_whatsapp,
+  data = d23 %>%
+    filter(in_policy == 1) %>%
+    dplyr::mutate(withdraw = ifelse(applied_of == 0, 1, 0))
+)
+
+mean_scale <- d23 %>%
+  filter(in_policy == 1) %>%
+  dplyr::mutate(withdraw = ifelse(applied_of == 0, 1, 0)) %>%
+  filter(recibe_whatsapp == 0) %>%
+  dplyr::summarise(m = round(mean(withdraw, na.rm = TRUE), 3)) %>%
+  pull(m)
+
+
+mean_rct <- d22 %>%
+  filter(!is.na(treatment) & in_rct == 1 & open == 1 & misfit == 1) %>%
+  filter(!is.na(codigo_carrera_1_int)) %>%
+  dplyr::mutate(
+    withdraw = ifelse(applied_of == 0, 1, 0),
+    treatment = ifelse(treatment == 4, 1, treatment)
+  ) %>%
+  filter(treatment == 1) %>%
+  dplyr::summarise(m = round(mean(withdraw, na.rm = TRUE), 3)) %>%
+  pull(m)
+
+means <- c(mean_rct, mean_rct, mean_scale, mean_scale)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+kable(stats, "latex",
+  booktabs = T,
+  col.names = c(" ", "N", "Count", "Mean", "Std. Dev."),
+  linesep = "",
+  align = c("l", "c", "c", "c", "c"),
+  escape = F,
+  caption = "Application Withdrawals",
+  position = "htp!", digits = 3
+)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+out <- capture.output(
+  stargazer(m1, m2, iv1, iv2,
+    type = "latex",
+    digits = 3,
+    title = "Application Withdrawals: RCT",
+    label = "tab: withdraw regressions",
+    table.placement = "htp!",
+    dep.var.labels.include = FALSE,
+    omit = c("strata_sexo", "strata_region", "strata_score"),
+    covariate.labels = c("Treatment 2", "Treatment 3", "Open", "Constant"),
+    keep.stat = c("n"),
+    no.space = TRUE,
+    model.names = FALSE,
+    add.lines = list(
+      c("Strata FE", "No", "Yes", "No", "Yes"),
+      c("Mean (Control / No text)", means)
+    ),
+    header = FALSE
+  )
+)
+
+# Replace hlines with booktabs rules
+out <- make_clean_table(out, caption = "Withdrawal", label = "tab:withdraw", paper_layout = TRUE, header = " & \\multicolumn{2}{c}{RCT} & \\multicolumn{2}{c}{Scale-Up} \\\\ \n \\cmidrule(lr){2-3} \\cmidrule(lr){4-5}")
+writeLines(out, file.path(table_dir, "withdraw.tex"))
+```
+
+\input{outputs/tables/withdraw.tex}
+
+# Table C.3. Population comparison: RCT vs scale-up compliers
+Following Abadie (2003), we proceed as follows:
+
+1. Estimate first stage take up, i.e., $E\left[D \mid Z=1, X \right], E\left[D \mid Z=0, X \right]$, where $D$ is whether the intervention was opened and $Z$ is the instrument (i.e., whether the person received the whatsapp message)
+2. Compute complier score for each person, i.e., $\pi(X) = E\left[D \mid Z=1, X \right] - E\left[D \mid Z=0, X \right]$
+3. Compute weights proportional to complier score, i.e., $w(X) = \frac{\pi(X)}{E\left[\pi(X)\right]}$
+4. Compute weigthed average of covariates using weights, i.e., $E\left[X \mid \text{compliers}\right]$
+
+```{r abadie_step1, echo=FALSE, message=FALSE, warning=FALSE}
+fs1 <- lm(any_opening ~ factor(strata_sexo) + factor(strata_region) + factor(strata_score), data = d23 %>% filter(in_policy == 1 & recibe_whatsapp == 1))
+fs0 <- lm(any_opening ~ factor(strata_sexo) + factor(strata_region) + factor(strata_score), data = d23 %>% filter(in_policy == 1 & recibe_whatsapp == 0))
+```
+
+```{r abadie_step2_3, echo=FALSE, message=FALSE, warning=FALSE}
+d23_p0 <- d23 %>%
+  filter(in_policy == 1) %>%
+  dplyr::mutate(recibe_whatsapp = 0)
+d23_p0$open_z0 <- predict(fs0, d23_p0)
+d23_p1 <- d23 %>%
+  filter(in_policy == 1) %>%
+  dplyr::mutate(recibe_whatsapp = 1)
+d23_p1$open_z1 <- predict(fs1, d23_p1)
+
+d23_p <- merge(d23_p0 %>% dplyr::select(mrun, open_z0), d23_p1 %>% dplyr::select(mrun, open_z1), by = "mrun")
+d23_p %<>% dplyr::mutate(pi = open_z1 - open_z0) %>% dplyr::mutate(weight = pi / sum(pi, na.rm = TRUE))
+```
+
+```{r weigthed_functions, echo=FALSE, message=FALSE, warning=FALSE}
+weighted.sd <- function(x, w) {
+  m <- weighted.mean(x, w, na.rm = TRUE)
+  sqrt(sum(w * (x - m)^2, na.rm = TRUE) / sum(w, na.rm = TRUE))
+}
+
+weighted.se <- function(x, w, na.rm = TRUE) {
+  if (na.rm) {
+    ok <- complete.cases(x, w)
+    x <- x[ok]
+    w <- w[ok]
+  }
+
+  # weighted mean
+  m <- weighted.mean(x, w)
+
+  # weighted variance numerator
+  var_num <- sum(w * (x - m)^2)
+
+  # effective sample size
+  n_eff <- (sum(w))^2 / sum(w^2)
+
+  # weighted sd
+  wsd <- sqrt(var_num / sum(w))
+
+  # weighted standard error
+  wsd / sqrt(n_eff)
+}
+```
+
+```{r abadie_step4, echo=FALSE, message=FALSE, warning=FALSE}
+stats <- rbind(
+  d22 %>% filter(open == 1) %>%
+    dplyr::mutate(
+      is_RM = ifelse(CODIGO_REGION_DOMICILIO == 13, 1, 0),
+      gpa = PROMEDIO_NOTAS
+    ) %>%
+    dplyr::summarise(
+      group = "RCT: Openers",
+      n = n(),
+      female = mean(female, na.rm = TRUE),
+      income = mean(income_below_median, na.rm = TRUE),
+      is_rm = mean(is_RM, na.rm = TRUE),
+      public = mean(public, na.rm = TRUE),
+      voucher = mean(voucher, na.rm = TRUE),
+      gpa = mean(gpa, na.rm = TRUE),
+      lm = mean(promlm, na.rm = TRUE),
+      rid = 1
+    ),
+  d22 %>% filter(open == 1) %>%
+    dplyr::mutate(
+      is_RM = ifelse(CODIGO_REGION_DOMICILIO == 13, 1, 0),
+      gpa = PROMEDIO_NOTAS
+    ) %>%
+    dplyr::summarise(
+      group = "RCT: Openers",
+      n = n(),
+      female = sd(female, na.rm = TRUE) / sqrt(n),
+      income = sd(income_below_median, na.rm = TRUE) / sqrt(n),
+      is_rm = sd(is_RM, na.rm = TRUE) / sqrt(n),
+      public = sd(public, na.rm = TRUE) / sqrt(n),
+      voucher = sd(voucher, na.rm = TRUE) / sqrt(n),
+      gpa = sd(gpa, na.rm = TRUE) / sqrt(n),
+      lm = sd(promlm, na.rm = TRUE) / sqrt(n),
+      rid = 2
+    ),
+  d23 %>%
+    left_join(d23_p %>% select(mrun, weight), by = "mrun") %>%
+    dplyr::mutate(
+      is_RM = ifelse(CODIGO_REGION_DOMICILIO == 13, 1, 0),
+      gpa = PROMEDIO_NOTAS
+    ) %>%
+    filter(in_policy == 1 & !is.na(weight)) %>% # remove missing weights
+    dplyr::summarise(
+      group = "Scale-up: Compliers",
+      n = n(),
+      female = weighted.mean(female, weight, na.rm = TRUE),
+      income = weighted.mean(income_below_median, weight, na.rm = TRUE),
+      is_rm = weighted.mean(is_RM, weight, na.rm = TRUE),
+      public = weighted.mean(public, weight, na.rm = TRUE),
+      voucher = weighted.mean(voucher, weight, na.rm = TRUE),
+      gpa = weighted.mean(gpa, weight, na.rm = TRUE),
+      lm = weighted.mean(promlm, weight, na.rm = TRUE),
+      rid = 1
+    ),
+  d23 %>%
+    left_join(d23_p %>% select(mrun, weight), by = "mrun") %>%
+    dplyr::mutate(
+      is_RM = ifelse(CODIGO_REGION_DOMICILIO == 13, 1, 0),
+      gpa = PROMEDIO_NOTAS
+    ) %>%
+    filter(in_policy == 1 & !is.na(weight)) %>% # remove missing weights
+    dplyr::summarise(
+      group = "Scale-up: Compliers",
+      n = n(),
+      female = weighted.sd(female, weight) / sqrt(n),
+      income = weighted.sd(income_below_median, weight) / sqrt(n),
+      is_rm = weighted.sd(is_RM, weight) / sqrt(n),
+      public = weighted.sd(public, weight) / sqrt(n),
+      voucher = weighted.sd(voucher, weight) / sqrt(n),
+      gpa = weighted.sd(gpa, weight) / sqrt(n),
+      lm = weighted.sd(promlm, weight) / sqrt(n),
+      rid = 2
+    )
+) %>%
+  arrange(group, rid) %>%
+  as.data.frame() %>%
+  dplyr::mutate(across(where(is.numeric), ~ ifelse(. %% 1 == 0, ., round(., 3)))) %>%
+  dplyr::mutate(
+    group = ifelse(rid == 2, "", paste("\\multirow{2}{*}{", group, "}")),
+    n = ifelse(rid == 2, "", paste("\\multirow{2}{*}{", n, "}")),
+    female = ifelse(rid == 2, paste0("(", female, ")"), female),
+    income = ifelse(rid == 2, paste0("(", income, ")"), income),
+    is_rm = ifelse(rid == 2, paste0("(", is_rm, ")"), is_rm),
+    public = ifelse(rid == 2, paste0("(", public, ")"), public),
+    voucher = ifelse(rid == 2, paste0("(", voucher, ")"), voucher),
+    gpa = ifelse(rid == 2, paste0("(", gpa, ")"), gpa),
+    lm = ifelse(rid == 2, paste0("(", lm, ")"), lm),
+  ) %>%
+  dplyr::select(-rid)
+```
+
+```{r abadie_tabulate, echo=FALSE, message=FALSE, warning=FALSE}
+# Table C.3 is written to a standalone .tex file that the paper \input's.
+# The tabular body comes from kable(); the surrounding float, caption, label
+# and note are written explicitly.
+c3_tbl <- kable(stats,
+  "latex",
+  table.envir = NULL,
+  booktabs = T,
+  col.names = c("Group", "N", "Female", "Low-Income", "Metro. Region", "Public", "Voucher", "GPA", "Math-Verbal"), linesep = "",
+  align = c("l", "c", "c", "c", "c", "c", "c", "c", "c"),
+  row.names = FALSE,
+  escape = F,
+  digits = 3
+) %>%
+  add_header_above(c(" " = 2, " Demographics" = 3, "High-School Type" = 2, "Scores" = 2))
+
+c3 <- c(
+  "\\begin{table}[htp!]",
+  "\\caption{\\label{tab:general summary stats rct vs compliers}Summary Statistics}",
+  "\\centerline{\\scalebox{0.8}{",
+  # kable emits \begin{tabular}[t]{...} only when a caption is passed;
+  # the caption is supplied by the wrapper above, so restore [t] here.
+  sub("\\begin{tabular}{", "\\begin{tabular}[t]{",
+      as.character(c3_tbl), fixed = TRUE),
+  "}}",
+  "\\vspace{0.2cm}{\\footnotesize \\emph{Note:} Summary statistics for RCT openers in 2022 and Scale-up compliers in 2023. Summary statistics for Scale-up compliers are computed using the procedure in Abadie (2003). Standard errors reported in parentheses.}",
+  "\\end{table}"
+)
+writeLines(c3, file.path(table_dir, "summary_stats_rct_vs_compliers.tex"))
+```
+
+\input{outputs/tables/summary_stats_rct_vs_compliers.tex}
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+drf <- rbind(
+  d22 %>%
+    filter(open == 1) %>%
+    dplyr::mutate(
+      is_RM = ifelse(CODIGO_REGION_DOMICILIO == 13, 1, 0),
+      gpa = PROMEDIO_NOTAS
+    ) %>%
+    dplyr::select(mrun, female, income_below_median, promlm, public, voucher, private, gpa, is_RM) %>% dplyr::mutate(weight = 1 / n(), group = "RCT", in_rct = 1),
+  d23 %>%
+    left_join(d23_p %>% select(mrun, weight), by = "mrun") %>%
+    dplyr::mutate(
+      is_RM = ifelse(CODIGO_REGION_DOMICILIO == 13, 1, 0),
+      gpa = PROMEDIO_NOTAS
+    ) %>%
+    filter(in_policy == 1 & !is.na(weight)) %>%
+    dplyr::select(mrun, female, income_below_median, promlm, public, voucher, private, gpa, is_RM, weight) %>% dplyr::mutate(group = "Policy", in_rct = 0)
+)
+
+m_f <- lm(female ~ in_rct, data = drf, weights = weight)
+m_i <- lm(income_below_median ~ in_rct, data = drf, weights = weight)
+m_lm <- lm(promlm ~ in_rct, data = drf, weights = weight)
+m_pb <- lm(public ~ in_rct, data = drf, weights = weight)
+m_pr <- lm(private ~ in_rct, data = drf, weights = weight)
+m_vc <- lm(voucher ~ in_rct, data = drf, weights = weight)
+m_rm <- lm(is_RM ~ in_rct, data = drf, weights = weight)
+m_ga <- lm(gpa ~ in_rct, data = drf, weights = weight)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+out <- capture.output(
+  stargazer(m_f, m_i, m_rm, m_pb, m_vc, m_ga, m_lm,
+    type = "latex",
+    digits = 3,
+    title = "Comparison RCT-Openers vs. Scaleup-Compliers",
+    label = "tab: comparison openers vs compliers",
+    table.placement = "H",
+    dep.var.labels.include = TRUE,
+    dep.var.labels = c("Female", "Low-Income", "Metrop. Region", "Public", "Voucher", "GPA", "Math-Verbal"),
+    omit = c("strata_sexo", "strata_region", "strata_score"),
+    covariate.labels = c("RCT", "Constant"),
+    keep.stat = c("n"),
+    no.space = TRUE,
+    model.names = FALSE,
+    header = FALSE
+  )
+)
+
+# Replace hlines with booktabs rules
+out <- make_clean_table(out, caption = "Comparison RCT-Openers vs. Scaleup-Compliers", label = "tab: comparison openers vs compliers", header = " & \\multicolumn{3}{c}{Demographics} & \\multicolumn{2}{c}{High-School Type} & \\multicolumn{2}{c}{Scores} \\\\ \n \\cmidrule(lr){2-4} \\cmidrule(lr){5-6} \\cmidrule(lr){7-8}")
+writeLines(out, file.path(table_dir, "comparison_openers_vs_compliers.tex"))
+```
+
+\input{outputs/tables/comparison_openers_vs_compliers.tex}

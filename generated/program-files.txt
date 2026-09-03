@@ -1,0 +1,7 @@
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/Stata/analysis_displacement_replication.do
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/Stata/analysis_policy_replication.do
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/Stata/analysis_rct_replication.do
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/Stata/fdr_qvalues.do
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/R/analysis_bcr.R
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/R/replication.Rmd
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/Makefile

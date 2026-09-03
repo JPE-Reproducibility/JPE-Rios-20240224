@@ -1,6 +1,11 @@
-title: "Stand-in title"
-author: "Dr Prof James 'JayJay' Author"
-paper_id: 12345678
+title: "College Application Mistakes and the Design of Information Policies at Scale"
+author: "Rios"
 round: 1
-repo: "https://www.github.com/standin"
-dropbox_rel_path: "JPE/Author-12345678/1"
+repo: "https://github.com/JPE-Reproducibility/JPE-Rios-20240224"
+paper_id: 20240224
+journal: "JPE"
+paper_slug: "Rios-20240224"
+dropbox_rel_path: "JPE/Rios-20240224/1"
+package_size_gb: 0.28
+package_max_file_size_gb: 2
+package_max_pkg_size_gb: 10

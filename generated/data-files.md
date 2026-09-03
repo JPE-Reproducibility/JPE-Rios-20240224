@@ -1,0 +1,10 @@
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/Data/cutoffs_and_extras_intnonecompfin.dta
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/Data/cutoffs_and_extras_intt2t3compfin.dta
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/exhibit_map.csv
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/Data/carreras_2019.csv
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/Data/carreras_2020.csv
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/Data/carreras_2022.csv
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/Data/carreras_2023.csv
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/Data/data_2020.csv
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/Data/data_2022.csv
+/var/folders/5q/yhcyv3z55wvg6lhgc3h22kk00000gq/T/20240224-1/replication-package/replication_package/Data/data_2023.csv
