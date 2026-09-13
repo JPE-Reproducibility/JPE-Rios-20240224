@@ -1,0 +1,685 @@
+---
+title: JPE Replication Report
+date: today
+number-sections: true
+format:
+  html: default
+---
+
+# Paper Identification
+
+|           |                      |
+|-----------|----------------------|
+| ID        | {{< var paper_id >}} |
+| Author    | {{< var author >}}   |
+| Title     | {{< var title >}}    |
+| Iteration | {{< var round >}}    |
+
+Some useful information up front:
+
+-   [JPE Data and Code Availability Policy](https://www.journals.uchicago.edu/journals/jpe/datapolicy)
+-   [Step by step guidance from Data Editor for Authors](https://jpedataeditor.github.io/)
+-   [Template README](https://social-science-data-editors.github.io/template_README/)
+
+# Summary
+
+In assessing compliance with our [Data and Code Availability Policy](https://www.journals.uchicago.edu/journals/jpe/datapolicy), our reproducibility team has identified the following issues, which we ask you to address:
+
+1.  Your makefile based pipeline did not work for us and I am afraid it does not work for many people. It is a _very_ elaborate makefile that 99% of people won't be able to read and/or understand. I don't want you to get rid of it, but i need a clear set of instructions in the readme of how to run the pipeline manually, step by step. Your favourite AI should be able to do that in a few seconds for you.
+2.  You need a section titled "Data Availability Statement" (DAS). Please see my website for examples. Currently it is not clear in any way where those data come from, and how I would go about getting them myself. Notice that this is orthogonal to you having included them in the package, so everything runs (which is great). Your DAS needs to give everyone out there a way to understand how you obtained/generated that data. If you generated the data yourself, you need to provide all relevant documentation (see below). If you got the data from a third party, then you need to cite the data properly.
+3.  You must include _all_ information about your experimental data generation. Surveys (in original and english), IRBs, a document outlining the selection of participants, etc. please see the unticked boxes in our report. 
+4.  Furthermore, you state in your readme that
+    
+    > The preprocessing scripts that construct them from the raw administrative and survey sources are not distributed: they refer to restricted source data and machine-specific locations, and they are not needed to reproduce any result in the paper.
+
+    All code that transforms your raw data must be part of this package. Whether they are *needed* is not your primary concern here - they must be available to future researchers who might gain access to your data. Also, I need a complete map of file names and locations of your admin data, i.e. I want to know what those files are called in your secure system, and under which file paths I could hope to find them. Again, your DAS needs to contain a full description of how to get access to the confidential admin data.
+5. It is a little confusing to read about Qualtrics surveys and admin data in your readme. Again, this goes back to your missing DAS. Your qualtrics output and programm files need to be part of the package, it's not admissible to ship some derived csv's, informing us that you removed some columns. Ideally I'd have your qualtrics output and the code you used to remove those columns, so that this is clearly documented. 
+6. You can disregard most of the computation-related comments of my replicator, as those have to do with our online computing system, where we cannot properly run `make`. We were successful in running everything that can be run.
+
+# General
+
+-   [ ] Data Availability and Provenance Statements
+    -   [ ] Statement about Rights - Part 1: Right to use the data (e.g. *did the authors lawfully obtain the data*)
+    -   [ ] Statement about Rights - Part 2: Right to publish the data (e.g. *are human subjects involved and did permission been granted to publish their data?*)
+    -   [ ] License for Data (optional, but recommended)
+    -   [x] Details on each Data Source
+-   [x] Dataset list
+-   [ ] Computational requirements
+    -   [x] Software Requirements
+    -   [x] Controlled Randomness (as necessary)
+    -   [ ] Memory, Runtime, and Storage Requirements
+-   [x] Description of programs/code
+    -   [ ] License for Code (Optional, but recommended)
+-   [x] List of tables and programs
+-   [ ] References (Optional, but recommended)
+
+# High-level Description of Research Project
+
+*This research project...*
+
+-   [ ] uses observational data.
+-   [x] uses *confidential* observational data.
+-   [x] uses data generated via experiment or trial by the authors (in field or lab).
+    -   [ ] For lab experiments: The code to implement the experimental protocol (z-Tree, o-Tree etc) is included in the package.
+    -   [ ] A PDF copy of IRB approval is contained in the package.
+    -   [ ] A PDF document outlining the design of the experiment, including information on the selection and eligibility of participants is included.
+    -   [ ] A PDF copy of the instructions given to participants in both original language and an English translation is included.
+-   [ ] uses data generated via survey by the authors (in field or online)
+    -   [ ] The programs used to administer the survey (e.g. qualtrics survey file) are included.
+    -   [ ] A PDF copy of IRB approval is contained in the package.
+    -   [ ] A PDF of the original questionaire(s) and information on the selection and eligibility of participants is included.
+-   [ ] is a simulation study: the data are generated by an algorithm.
+-   [ ] is a numerical illustration: no data are used but code is used to produce illustrative output (tables, figures)
+
+# Data description
+
+For any data that cannot be provided as part of the replication package, please provide the following information as part of the README.
+
+> {REQUIRED} Please specify how long the data will be preserved in the restricted-access location.
+
+> {REQUIRED} Please provide affirmation of support for replication checks. - As per the [JPE policy](https://jpedataeditor.github.io/policy.html), "In cases where data cannot be published in an openly accessible trusted data repository like the JPE dataverse, authors who have requested an exemption to publish them at the time of first submission must commit to preserving the data and code for a period of no less than five years following the publication of the paper. They should also provide reasonable assistance to requests for clarification and replication."
+
+> {REQUIRED} Please provide a codebook for the data. - The codebook should at a minimum describe the variables obtained from the data source, in a manner that will let others verify that they have obtained a substantially similar dataset if successfully obtaining access to the data.
+
+## Data Sources
+
+| file/name | public | private | DOI/URL | Access described | cited readme | cited paper |
+|-----------|-----------|-----------|-----------|-----------|-----------|-----------|
+| data_2020.csv | yes | no | \- | no | yes | yes |
+| carreras_2019.csv | yes | no | \- | no | yes | yes |
+| carreras_2020.csv | yes | no | \- | no | yes | yes |
+| data_2022.csv | yes | no | \- | no | yes | yes |
+| data_2023.csv | yes | no | \- | no | yes | yes |
+| carreras_2022.csv | yes | no | \- | no | yes | yes |
+| cutoffs_and_extras_intnonecompfin.dta | yes | no | \- | no | yes | yes |
+| cutoffs_and_extras_intt2t3compfin.dta | yes | no | \- | no | yes | yes |
+| carreras_2023.csv | yes | no | \- | no | yes | yes |
+| RIS (Registro de Información Social) administrative data | no | yes | \- | yes | yes | yes |
+
+### data_2020.csv
+
+-   [x] Dataset is provided in public deposit
+-   [ ] Dataset is PRIVATELY provided (not for publication)
+-   [ ] DOI or URL is provided
+    -   No DOI or URL is provided.
+-   [ ] Access conditions are described:
+    -   No separate access conditions are described for this processed replication file.
+-   [ ] Data are not cited, but a working paper, article, or other document is cited (not a data citation)
+-   [x] Data are cited
+    -   [x] in the manuscript
+    -   [x] in the README:
+
+> `data_2020.csv`: processed 2020 applicant/survey data used for the paper's baseline and truth-telling analyses. Missing values are encoded as `__REPLICATION_MISSING__`; `R/replication.Rmd` supplies this value through `na.strings` when importing the file.
+
+### carreras_2019.csv
+
+-   [x] Dataset is provided in public deposit
+-   [ ] Dataset is PRIVATELY provided (not for publication)
+-   [ ] DOI or URL is provided
+    -   No DOI or URL is provided.
+-   [ ] Access conditions are described:
+    -   No separate access conditions are described for this processed replication file.
+-   [ ] Data are not cited, but a working paper, article, or other document is cited (not a data citation)
+-   [x] Data are cited
+    -   [x] in the manuscript
+    -   [x] in the README:
+
+> `carreras_2019.csv`: program-level admissions and cutoff data used in the 2020 comparisons.
+
+### carreras_2020.csv
+
+-   [x] Dataset is provided in public deposit
+-   [ ] Dataset is PRIVATELY provided (not for publication)
+-   [ ] DOI or URL is provided
+    -   No DOI or URL is provided.
+-   [ ] Access conditions are described:
+    -   No separate access conditions are described for this processed replication file.
+-   [ ] Data are not cited, but a working paper, article, or other document is cited (not a data citation)
+-   [x] Data are cited
+    -   [x] in the manuscript
+    -   [x] in the README:
+
+> `carreras_2020.csv`: program-level admissions and cutoff data used in the 2020 comparisons.
+
+### data_2022.csv
+
+-   [x] Dataset is provided in public deposit
+-   [ ] Dataset is PRIVATELY provided (not for publication)
+-   [ ] DOI or URL is provided
+    -   No DOI or URL is provided.
+-   [ ] Access conditions are described:
+    -   No separate access conditions are described for this processed replication file.
+-   [ ] Data are not cited, but a working paper, article, or other document is cited (not a data citation)
+-   [x] Data are cited
+    -   [x] in the manuscript
+    -   [x] in the README:
+
+> `data_2022.csv`: processed 2022 applicant, experiment, survey, application, and admissions data. It is the single annual person-level input for `R/replication.Rmd`, `Stata/analysis_rct_replication.do`, and `Stata/analysis_displacement_replication.do`.
+
+### data_2023.csv
+
+-   [x] Dataset is provided in public deposit
+-   [ ] Dataset is PRIVATELY provided (not for publication)
+-   [ ] DOI or URL is provided
+    -   No DOI or URL is provided.
+-   [ ] Access conditions are described:
+    -   No separate access conditions are described for this processed replication file.
+-   [ ] Data are not cited, but a working paper, article, or other document is cited (not a data citation)
+-   [x] Data are cited
+    -   [x] in the manuscript
+    -   [x] in the README:
+
+> `data_2023.csv`: processed 2023 applicant, intervention, survey, application, and admissions data. It is the single annual person-level input for `R/replication.Rmd` and `Stata/analysis_policy_replication.do`.
+
+### carreras_2022.csv
+
+-   [x] Dataset is provided in public deposit
+-   [ ] Dataset is PRIVATELY provided (not for publication)
+-   [ ] DOI or URL is provided
+    -   No DOI or URL is provided.
+-   [ ] Access conditions are described:
+    -   No separate access conditions are described for this processed replication file.
+-   [ ] Data are not cited, but a working paper, article, or other document is cited (not a data citation)
+-   [x] Data are cited
+    -   [x] in the manuscript
+    -   [x] in the README:
+
+> `carreras_2022.csv`: 2022 program-level capacities, admissions, cutoffs, and program characteristics used in the displacement analysis.
+
+### cutoffs_and_extras_intnonecompfin.dta
+
+-   [x] Dataset is provided in public deposit
+-   [ ] Dataset is PRIVATELY provided (not for publication)
+-   [ ] DOI or URL is provided
+    -   No DOI or URL is provided.
+-   [ ] Access conditions are described:
+    -   No separate access conditions are described for this processed replication file.
+-   [ ] Data are not cited, but a working paper, article, or other document is cited (not a data citation)
+-   [x] Data are cited
+    -   [x] in the manuscript
+    -   [x] in the README:
+
+> `cutoffs_and_extras_intnonecompfin.dta`: program-level cutoff and capacity information under one of the two assignment counterfactuals used in the displacement analysis.
+
+### cutoffs_and_extras_intt2t3compfin.dta
+
+-   [x] Dataset is provided in public deposit
+-   [ ] Dataset is PRIVATELY provided (not for publication)
+-   [ ] DOI or URL is provided
+    -   No DOI or URL is provided.
+-   [ ] Access conditions are described:
+    -   No separate access conditions are described for this processed replication file.
+-   [ ] Data are not cited, but a working paper, article, or other document is cited (not a data citation)
+-   [x] Data are cited
+    -   [x] in the manuscript
+    -   [x] in the README:
+
+> `cutoffs_and_extras_intt2t3compfin.dta`: program-level cutoff and capacity information under one of the two assignment counterfactuals used in the displacement analysis.
+
+### carreras_2023.csv
+
+-   [x] Dataset is provided in public deposit
+-   [ ] Dataset is PRIVATELY provided (not for publication)
+-   [ ] DOI or URL is provided
+    -   No DOI or URL is provided.
+-   [ ] Access conditions are described:
+    -   No separate access conditions are described for this processed replication file.
+-   [ ] Data are not cited, but a working paper, article, or other document is cited (not a data citation)
+-   [x] Data are cited
+    -   [x] in the manuscript
+    -   [x] in the README:
+
+> `carreras_2023.csv`: 2023 program-level admissions and program-characteristics data.
+
+### RIS (Registro de Información Social) administrative data
+
+-   [ ] Dataset is provided in public deposit
+-   [x] Dataset is PRIVATELY provided (not for publication)
+    -   The data were not shared with the replicators.
+-   [ ] DOI or URL is provided
+    -   No DOI or URL is provided.
+-   [x] Access conditions are described:
+    -   RIS contains individual-level income and household information from Chilean administrative records, matched with other administrative sources such as college enrollment and admissions-process data.
+    -   The data are not publicly available.
+    -   The access agreement does not permit the microdata to be removed from the secure offices of the Ministerio de Desarrollo Social.
+    -   Researchers outside the authorized premises therefore cannot legally or practically run the analysis on the underlying records.
+    -   Tables D.1 and D.2 were generated by a research assistant working within the Ministry's secure environment.
+    -   The derived “Implied BCR” row of Table D.1 is reproduced by `R/analysis_bcr.R` using published estimates rather than the restricted microdata.
+-   [ ] Data are not cited, but a working paper, article, or other document is cited (not a data citation)
+-   [x] Data are cited
+    -   [x] in the manuscript
+    -   [x] in the README:
+
+> Tables D.1 and D.2 use data from RIS (Registro de Información Social), which contain individual-level income and household information from Chilean administrative records, matched with other administrative data sources such as college enrollment and admission process data. The data are not publicly available, and the access agreement does not permit the microdata to be removed from the secure offices of the Ministerio de Desarrollo Social.
+
+# Requirements
+
+-   [x] README is in TXT, MD, or PDF format
+-   [x] README is accessible at the root of the package (not inside a folder)
+-   [ ] Title conforms to guidance (starts with "Data and Code for: Title of Paper" or "Code for: Title of Paper", is properly capitalized)
+-   [ ] Authors (with affiliations) are listed in the same order as on the paper
+
+> {REQUIRED} Please review the title of the deposit as per our guidelines.
+
+> {REQUIRED} Please review authors and affiliations on the deposit. In general, they are the same, and in the same order, as for the manuscript; however, authors can deviate from that order.
+
+## Stated Requirements
+
+-   [ ] No requirements specified
+-   [x] Software Requirements specified as follows:
+    -   The code uses relative paths and is driven by the `Makefile` at the root of this package; see **Scripts** below. This package was verified end to end on Linux with **Stata 19 SE**, **R 4.5.2**, **pandoc 3.10.2** and **TinyTeX (TeX Live 2026)**. `make all` completed successfully and every generated table matched the paper. Three external requirements are worth calling out because they are easy to miss:
+
+        -   **pandoc** is required by `rmarkdown::render`. RStudio bundles its own copy, so this is invisible when working interactively and only surfaces when the package is run headless on a server, which is exactly what a replication check does.
+        -   **`xelatex`** is required for the PDF render (the R Markdown header requests it). An HTML-only render does not need LaTeX.
+        -   **Stata edition.** On a machine with several Stata editions installed, the licence may cover only one of them. A working `stata-se` can sit next to an unlicensed `stata-mp`, and naive auto-detection picks the wrong one. Pass `STATA=/path/to/stata-se` to `make` if the auto-detected binary fails.
+        -   Stata: The Stata scripts use built-in commands (`regress`, `ivregress`, `import delimited`, and standard data-management commands) and the following user-written packages:
+
+        ``` stata
+        ssc install estout, replace
+        ssc install rwolf2, replace
+        ssc install texdoc, replace
+        ```
+
+        `estout` provides `eststo`; `rwolf2` provides Romano–Wolf multiple-hypothesis-testing corrections; and `texdoc` writes the regression tables to LaTeX. The scripts install these packages automatically if they are missing, but installing them in advance is recommended. Internet access may be required the first time they are installed.
+
+        -   R: Install the packages used by `R/replication.Rmd` with:
+
+        ``` r
+        install.packages(c(
+          "dplyr", "tidyr", "magrittr", "stargazer", "ggplot2",
+          "kableExtra", "stringr", "RColorBrewer", "AER",
+          "rmarkdown", "knitr", "data.table"
+        ))
+        ```
+
+        The R Markdown header additionally requires the LaTeX packages `floatrow`, `booktabs`, `array`, `caption`, `multirow` and `threeparttable`, normally installed through the TeX distribution. The header also defines the `L`, `C` and `R` column types used by the generated tables; these definitions match the paper's own preamble. The R workflow was verified rendering to both HTML and PDF. The package list above is sufficient to render `R/replication.Rmd`.
+-   [ ] Computational Requirements specified as follows:
+    -   Cluster size, etc.
+-   [ ] Time Requirements specified as follows:
+    -   Length of necessary computation (hours, weeks, etc.)
+-   [ ] Requirements are complete.
+
+For missing requirements, see the list of required changes in @sec-findings
+
+# Analyzing Data and Code Files
+
+{{< include generated/report-pii.md >}}
+
+{{< include generated/report-file-paths.md >}}
+
+{{< include generated/report-duplicates.md >}}
+
+{{< include generated/report-zero-files.md >}}
+
+{{< include generated/report-large-files.md >}}
+
+## Code description
+
+{{< include generated/report-cloc.md >}}
+
+-   [x] The replication package contains a "main" or "master" file(s) which calls all other auxiliary programs.
+
+> NOTE: In-text numbers that reference numbers in tables do not need to be listed. Only in-text numbers that correspond to no table or figure need to be listed.
+
+## Computing Environment of the Replicator
+
+-   Nuvolos remote machine, 4vCU, 16GB.
+
+-   StataNow 19.5
+
+-   R 4.5.2
+
+-   Pandoc 3.10.2
+
+-   TinyTeX (TeX Live 2026)
+
+# Replication
+
+-   Downloaded code and data from dropbox.
+
+-   Ran code as per README, from `make`.
+
+-   Error when running R part from `make`: `bash         format: html_document           Error in loadNamespace(x) : there is no package called ‘rmarkdown’           Calls: loadNamespace -> withRestarts -> withOneRestart -> doWithOneRestart           Execution halted     make: *** [Makefile:89: R/outputs/.render.stamp] Error 1`
+
+-   Fixed the error.
+
+-   I had to install some of the packages in a different way (because of Nuvolos sandbox restrictions): `bash     conda install -y conda-forge::r-kableextra     conda install -y conda-forge::r-dplyr     conda install -y conda-forge::r-stargazer     conda install -y conda-forge::r-ggplot2     conda install -y conda-forge::r-aer     conda install -y conda-forge::r-data.table`
+
+-   I got this other error in the R part:
+
+    ``` bash
+        ! LaTeX Error: File `outputs/tables/prevalence_mistakes.tex' not found.
+
+          ! Emergency stop.
+          <read *> 
+
+          Error: LaTeX failed to compile replication.tex. See https://yihui.org/tinytex/r/#debugging for debugging tips. See replication.log for more info.
+          Execution halted
+    make: *** [Makefile:89: R/outputs/.render.stamp] Error 1 
+    ```
+
+    This seems to be related to the TinyTeX (TeX Live 2026) installation, running `mkdir -p R/outputs/outputs && ln -sfn ../tables R/outputs/outputs/tables` at the root of the package solved it.
+
+-   `make all` stopped because it thought it identified a Stata error:
+
+``` bash
+!!! Stata error in Stata/analysis_rct_replication.log:
+20-      2. Unicode is supported; see help unicode_advice.
+21-      3. More than 2 billion observations are allowed; see help obs_advice.
+22-      4. Maximum number of variables is set to 5,000 but can be increased;
+23-          see help set_maxvar.
+24-
+25-
+26-Running /usr/local/statanow19/sysprofile.do ...
+27-file /tmp/.dbpath1 not found
+28:r(601);
+make: *** [Makefile:74: Stata/output/.rct.stamp] Error 1
+```
+
+```         
+So I had to run the Stata parts separately.
+```
+
+-   Code ran to completion.
+
+# Findings {#sec-findings}
+
+Error when running R part from `make`:
+
+``` bash
+    format: html_document
+      Error in loadNamespace(x) : there is no package called ‘rmarkdown’
+      Calls: loadNamespace -> withRestarts -> withOneRestart -> doWithOneRestart
+      Execution halted
+make: *** [Makefile:89: R/outputs/.render.stamp] Error 1
+```
+
+Perhaps you may want to include the R package installation from the `Makefile`. Anyways, the installation of these packages is indicated by the authors in the README. I had to install some of the packages in a different way (because of Nuvolos sandbox restrictions):
+
+``` bash
+conda install -y conda-forge::r-kableextra
+conda install -y conda-forge::r-dplyr
+conda install -y conda-forge::r-stargazer
+conda install -y conda-forge::r-ggplot2
+conda install -y conda-forge::r-aer
+conda install -y conda-forge::r-data.table
+```
+
+I got this other error in the R part:
+
+``` bash
+! LaTeX Error: File `outputs/tables/prevalence_mistakes.tex' not found.
+      
+      ! Emergency stop.
+      <read *> 
+      
+      Error: LaTeX failed to compile replication.tex. See https://yihui.org/tinytex/r/#debugging for debugging tips. See replication.log for more info.
+      Execution halted
+make: *** [Makefile:89: R/outputs/.render.stamp] Error 1 
+```
+
+This seems to be related to the TinyTeX (TeX Live 2026) installation, running `mkdir -p R/outputs/outputs && ln -sfn ../tables R/outputs/outputs/tables` at the root of the package solved it. Note for the authors: `make all` stopped because it thought it identified a Stata error:
+
+``` bash
+!!! Stata error in Stata/analysis_rct_replication.log:
+20-      2. Unicode is supported; see help unicode_advice.
+21-      3. More than 2 billion observations are allowed; see help obs_advice.
+22-      4. Maximum number of variables is set to 5,000 but can be increased;
+23-          see help set_maxvar.
+24-
+25-
+26-Running /usr/local/statanow19/sysprofile.do ...
+27-file /tmp/.dbpath1 not found
+28:r(601);
+make: *** [Makefile:74: Stata/output/.rct.stamp] Error 1
+```
+
+This is actually normal behavior for Stata running on some sandboxes (this is the case for this replication), so maybe you may want to edit your error indentifier in the `Makefile` (perhaps by discarding some values of `r()`).
+
+## Missing Requirements
+
+-   [x] Computational Requirements specified as follows:
+    -   Cluster size, disk size, memory size, etc.
+-   [x] Time Requirements
+    -   Length of necessary computation (hours, weeks, etc.)
+
+> \[REQUIRED\] Please amend README to contain complete requirements.
+
+You can copy the section above, amended if necessary.
+
+## Data Preparation Code
+
+No data preparation code was provided.
+
+## Tables and Figures
+
+Table 6 is not produced in the code, the authors say "not distributed: requires the proprietary allocation algorithm". Also, Tables D.1 and D.2 were not produced, the comment the authors provide is "not distributed: requires restricted RIS microdata". The README states the following: \## Why Tables 6, D.1, and D.2 cannot be replicated from this archive
+
+The inability to reproduce these three tables from the public replication package is due to documented external access restrictions, rather than an omission in the analysis code. The code used to produce them is not included in this archive; it can be supplied to the data editor on request.
+
+### Table 6: proprietary allocation algorithm
+
+Table 6 reports scale-up simulations that require the allocation algorithm used by the Chilean college-admissions authority. The algorithm is proprietary software covered by contractual agreements and cannot be shared or redistributed in a replication archive. The simulation therefore cannot be rerun externally using the public files alone. In particular, providing the public inputs without the allocation engine would not reproduce the analysis: the allocation mechanism is a necessary computational component of the simulation.
+
+### Tables D.1 and D.2: restricted RIS administrative data
+
+Tables D.1 and D.2 use data from RIS (Registro de Información Social), which contain individual level income and household information from Chilean administrative records, matched with other administrative data sources such as college enrollment and admission process data. The data are not publicly available, and the access agreement does not permit the microdata to be removed from the secure offices of the Ministerio de Desarrollo Social. Consequently, no researcher outside the authorized premises can legally or practically run the analysis on the underlying records. The tables were generated by a research assistant working within the Ministry's secure environment; this was the only permitted setting in which the analysis could be performed. The derived "Implied BCR" row of Table D.1 is the exception: it is reproduced by `R/analysis_bcr.R` from the published estimates (see **In-text numbers** above).
+
+Besides the latter three tables, *all* outputs were reproduced and all of them looked *identical* to those in the manuscript, with no discrepancies.
+
+## In-Text Numbers
+
+-   [ ] In-text numbers not verified.
+
+-   [ ] There are no in-text numbers, or all in-text numbers stem from tables and figures.
+
+-   [x] There are in-text numbers, but they are not identified in the code
+
+-   Page 1, lines 13-14: Same
+
+-   Page 3, line 8: Same
+
+-   Page 3, line 10: Same
+
+-   Page 3, line 11: Same
+
+-   Page 4, line 5: Same
+
+-   Page 4, line 7: Same
+
+-   Page 4, line 9: Same
+
+-   Page 4, line 13: Same
+
+-   Page 5, line 15: Not found — "the policy roughly doubles the probability that initially unmatched students get admitted ... and the probability to improve their assignment."
+
+-   Page 5, line 19: Not found — "students who get assigned thanks to the policy are three times more likely to enroll in their assigned program."
+
+-   Page 8, line 27: Not found — "45 out of 58 Chilean universities."
+
+-   Page 9, line 8: Not found — "up to 10 programs."
+
+-   Page 9, line 32: Not found — maximum list length increased to 20.
+
+-   Page 16, line 2: Same
+
+-   Page 16, lines 4-5: Same
+
+-   Page 16, line 7: Same
+
+-   Page 16, line 9: Same
+
+-   Page 16, line 21: Same
+
+-   Page 16, line 22: Same
+
+-   Page 16, line 24: Same
+
+-   Page 16, line 29: Not found — "They represent 67% of survey respondents."
+
+-   Page 16, line 31: Not found — "nearly 90% of students are short-list students."
+
+-   Page 19, line 18: Same
+
+-   Page 19, line 19: Same
+
+-   Page 19, line 22: Same
+
+-   Page 22, line 4: Same
+
+-   Page 22, line 10: Same
+
+-   Page 22, line 13: Same
+
+-   Page 24, line 14: Not found — "107,663 students (approximately 72.36% of applicants)."
+
+-   Page 24, line 17: Not found — "30,709 (approximately 28.52%) opened their personalized website."
+
+-   Page 24, line 19: Same
+
+-   Page 25, line 38: Same
+
+-   Page 26, line 6: Same
+
+-   Page 26, line 13: Same
+
+-   Page 26, line 20: Same
+
+-   Page 26, line 22: Same
+
+-   Page 27, line 17: Not found — "fewer than 0.1% of students dropping their application."
+
+-   Page 27, line 30: Same
+
+-   Page 28, line 3: Same
+
+-   Page 29, line 2: Not found — "over 72% of the full applicant pool."
+
+-   Page 32, line 2: Not found — significance level alpha = 0.05.
+
+-   Page 32, line 3: Same
+
+-   Page 32, line 4: Same
+
+-   Page 32, line 5: Same
+
+-   Page 32, line 25: Not found — "fewer than 0.5%" of T1/T4 students are displaced.
+
+-   Page 32, line 28: Not found — "Only 7.7% of programs meet the necessary conditions."
+
+-   Page 33, lines 9-10: Not found — "206 students ... representing 0.5% of the non-experimental population."
+
+-   Page 33, line 12: Not found — "55% of the 1,993 programs ... still have vacancies."
+
+-   Page 33, line 13: Not found — "20% of the 147,056 total seats remain unassigned."
+
+-   Page 33, line 15: Not found — average number of unfilled seats is 10.8.
+
+-   Page 33, lines 17-18: Not found — "910 different programs," with a median of one treated student gaining admission per program.
+
+-   Page 34, line 20: Same
+
+-   Page 35, line 15: Not found — score range changed from \[210, 850\] to \[100, 1000\].
+
+-   Page 38, line 1: Same
+
+-   Page 38, line 2: Same
+
+-   Page 38, line 6: Same
+
+-   Page 38, line 7: Same
+
+-   Page 38, line 11: Same
+
+-   Page 38, line 13: Same
+
+-   Page 38, line 15: Same
+
+-   Page 38, line 16: Same
+
+-   Page 39, line 25: Not found — direct implementation cost of approximately \$20,000-\$50,000.
+
+-   Page 40, line 12: Same
+
+-   Page 40, line 14: Same
+
+-   Page 40, line 27: Same
+
+-   Page 40, lines 28-29: Not found — BCR increases to approximately 375 if gains persist over the working life.
+
+-   Page 52, line 43: Not found — "58% declare to know ... cutoffs for all their listed programs, and 9% ... not to know any."
+
+-   Page 56, line 11: Same
+
+-   Page 56, line 12: Same
+
+-   Page 56, line 13: Same
+
+-   Page 56, line 15: Same
+
+-   Page 65, line 5: Not found — "close to two-thirds of applications."
+
+-   Page 65, line 14: Not found — "1,000 bootstrap simulations."
+
+-   Page 65, lines 21-22: Not found — "1,000 cutoffs for each program."
+
+-   Page 70, line 9: Not found — score range changed from \[210, 850\] to \[100, 1000\].
+
+-   Page 71, line 17: Same — 34% increase.
+
+-   Page 71, line 17: Mismatch — text reports F-stat = 1414.6, while Table C.1 reports 1414.8112, which rounds to 1414.8.
+
+-   Page 74, line 3: Not found — "approximately 0.5 standard deviations in the Math exam distribution."
+
+-   Page 79, line 6: Not found — direct implementation cost of \$20,000-\$50,000.
+
+-   Page 80, lines 1-2: Not found — "four oldest cohorts (2006-2009)."
+
+-   Page 80, line 39: Same
+
+-   Page 81, lines 1-2: Same
+
+-   Page 81, line 3: Same
+
+-   Page 81, line 21: Same
+
+-   Page 81, line 23: Same — first-stage effect 0.1782.
+
+-   Page 81, line 23: Same — annual income effect \$86.74.
+
+-   Page 81, line 23: Not found — resulting ITT gain of \$15.5 per student.
+
+-   Page 81, line 24: Not found — assumed maximum cost of \$50,000 and resulting per-student cost of \$0.38.
+
+-   Page 81, line 25: Not found — 5% discount rate.
+
+-   Page 81, line 25: Same — BCR of 22.
+
+-   Page 81, line 25: Same — h = 13.
+
+-   Page 81, lines 26-27: Not found — BCR of approximately 375, h = 47, and retirement at age 65.
+
+-   Page 81, line 33: Same — estimated tuition effect of -\$6.49.
+
+# Classification
+
+-   [ ] full reproduction
+-   [ ] full reproduction with minor issues
+-   [x] partial reproduction (see above)
+-   [ ] not able to reproduce most or all of the results (reasons see above)
+
+## Reason for incomplete reproducibility
+
+-   [ ] None.
+-   [ ] `Discrepancy in output` (either figures or numbers in tables or text differ)
+-   [ ] `Bugs in code` that were fixable by the replicator (but should be fixed in the final deposit)
+-   [ ] `Code missing`, in particular if it prevented the replicator from completing the reproducibility check
+    -   [ ] `Data preparation code missing` should be checked if the code missing seems to be data preparation code
+-   [ ] `Code not functional` is more severe than a simple bug: it prevented the replicator from completing the reproducibility check
+-   [ ] `Software not available to replicator` may happen for a variety of reasons, but in particular (a) when the software is commercial, and the replicator does not have access to a licensed copy, or (b) the software is open-source, but a specific version required to conduct the reproducibility check is not available.
+-   [ ] `Insufficient time available to replicator` is applicable when (a) running the code would take weeks or more (b) running the code might take less time if sufficient compute resources were to be brought to bear, but no such resources can be accessed in a timely fashion (c) the replication package is very complex, and following all (manual and scripted) steps would take too long.
+-   [x] `Data missing` is marked when data *should* be available, but was erroneously not provided, or is not accessible via the procedures described in the replication package
+-   [ ] `Data not available` is marked when data requires additional access steps, for instance purchase or application procedure.
+-   [ ] `Missing README` is marked if there is no README to guide the replicator, or the README is not in compliance with JPE requirements
+
+{{< include generated/report-pii.md >}}
